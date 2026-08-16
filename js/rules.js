@@ -10,9 +10,17 @@ export function other(side) {
   return side === 'self' ? 'opponent' : 'self';
 }
 
+// side ('self'|'opponent') のチームであらかじめ指定された、サーブ/レシーブを
+// 担当する選手のポジション ('front'|'back') を返す。
+export function serverPositionOf(match, side) {
+  const team = side === 'self' ? match.self : match.opponent;
+  return team.serverPosition || 'back';
+}
+
 // --- 決まり方（ショットの種類 × 決めた/ミスした × どちらのチームが行ったか） ---
-// レシーブ・サービスエース・ダブルフォルトは「サーブ側/レシーブ側とも後衛が行う」という
-// 一般的な前衛・後衛の定型フォーメーションを前提に、実行選手を自動判定できる。
+// レシーブ・サービスエース・ダブルフォルトは「サーブ側/レシーブ側とも、各チームで
+// あらかじめ指定したサーブ担当選手（前衛 or 後衛）が行う」という前提を元に、
+// 実行選手を自動判定できる。
 // ボレー・スマッシュ・ストローク・アウト・ネット・その他はラリー中に前衛・後衛どちらが
 // 行ったか一意に決まらないため、記録画面側で選手を選んでもらう。
 export const AUTO_POSITION_SHOT_TYPES = new Set(['ace', 'double_fault', 'receive']);
@@ -140,8 +148,9 @@ export function deriveState(match) {
         scoreOpponent,
       };
 
-  // 後衛の選手が常にサーブするという定型フォーメーションを前提に自動判定する。
+  // 各チームで指定されたサーブ担当選手（前衛 or 後衛）が常にサーブするという前提で自動判定する。
   const currentServerTeam = isFinished ? null : (server === 'self' ? match.self : match.opponent);
+  const currentServerPosition = currentServerTeam ? (currentServerTeam.serverPosition || 'back') : null;
 
   return {
     games,
@@ -151,7 +160,8 @@ export function deriveState(match) {
     matchWinner,
     isFinished,
     currentServer: isFinished ? null : server,
-    currentServerPlayerName: isFinished ? null : currentServerTeam.back,
+    currentServerPosition,
+    currentServerPlayerName: isFinished ? null : currentServerTeam[currentServerPosition],
     pointsToWinCurrentGame: isFinished ? null : (isFinalGame ? POINTS_TO_WIN_FINAL_GAME : POINTS_TO_WIN_GAME),
   };
 }

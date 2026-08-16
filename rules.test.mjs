@@ -4,8 +4,8 @@ import { deriveState, GAMES_TO_WIN_MATCH } from './js/rules.js';
 
 function baseMatch(overrides = {}) {
   return {
-    self: { front: '自前衛', back: '自後衛' },
-    opponent: { front: '相前衛', back: '相後衛' },
+    self: { front: '自前衛', back: '自後衛', serverPosition: 'back' },
+    opponent: { front: '相前衛', back: '相後衛', serverPosition: 'back' },
     firstServer: 'self',
     pointLog: [],
     ...overrides,
@@ -121,9 +121,31 @@ test('ダブルフォルトを含むポイントも通常通り集計される',
   assert.equal(state.games[0].scoreOpponent, 1);
 });
 
-test('サーブする選手は常に後衛（自動判定）', () => {
+test('サーブする選手はチームごとに指定したポジション（後衛）で自動判定される', () => {
   const match = baseMatch({ pointLog: [] });
   const state = deriveState(match);
   assert.equal(state.currentServer, 'self');
+  assert.equal(state.currentServerPosition, 'back');
+  assert.equal(state.currentServerPlayerName, '自後衛');
+});
+
+test('サーブ担当選手を前衛に指定した場合はその選手が自動判定される', () => {
+  const match = baseMatch({
+    self: { front: '自前衛', back: '自後衛', serverPosition: 'front' },
+    pointLog: [],
+  });
+  const state = deriveState(match);
+  assert.equal(state.currentServer, 'self');
+  assert.equal(state.currentServerPosition, 'front');
+  assert.equal(state.currentServerPlayerName, '自前衛');
+});
+
+test('serverPositionが未指定の場合は後衛にフォールバックする（後方互換）', () => {
+  const match = baseMatch({
+    self: { front: '自前衛', back: '自後衛' },
+    pointLog: [],
+  });
+  const state = deriveState(match);
+  assert.equal(state.currentServerPosition, 'back');
   assert.equal(state.currentServerPlayerName, '自後衛');
 });

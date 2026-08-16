@@ -1,4 +1,4 @@
-import { deriveState, reasonOptions, other, AUTO_POSITION_SHOT_TYPES } from './rules.js';
+import { deriveState, reasonOptions, other, serverPositionOf, AUTO_POSITION_SHOT_TYPES } from './rules.js';
 import { saveMatch } from './storage.js';
 import { shell, escapeHtml } from './ui.js';
 
@@ -44,7 +44,7 @@ export function renderMatchScreen(app, initialMatch) {
     addPoint({
       winner: other(server),
       reason: { shotType: 'double_fault', outcome: 'error', agentTeam: server },
-      actingPlayerKey: 'back',
+      actingPlayerKey: serverPositionOf(match, server),
       serveType: '2nd',
       server,
     });
@@ -61,7 +61,7 @@ export function renderMatchScreen(app, initialMatch) {
       addPoint({
         winner: pendingWinner,
         reason,
-        actingPlayerKey: 'back',
+        actingPlayerKey: serverPositionOf(match, reason.agentTeam),
         serveType: servePhase,
         server: state.currentServer,
       });
@@ -117,7 +117,7 @@ export function renderMatchScreen(app, initialMatch) {
     if (pendingWinner === null) {
       actionHtml = `
         <div class="serve-status">
-          サーブ: <strong>${escapeHtml(teamLabel(state.currentServer))}（${escapeHtml(state.currentServerPlayerName)}・後衛）</strong>
+          サーブ: <strong>${escapeHtml(teamLabel(state.currentServer))}（${escapeHtml(state.currentServerPlayerName)}・${state.currentServerPosition === 'front' ? '前衛' : '後衛'}）</strong>
           — ${servePhase === '1st' ? 'ファーストサーブ' : 'セカンドサーブ'}
         </div>
         <button class="fault-btn btn-block" id="btn-fault">サーブフォルト</button>

@@ -54,15 +54,25 @@ function renderSetup() {
       <form class="card" id="setup-form">
         <fieldset>
           <legend>自チーム</legend>
-          <div class="field"><label>前衛の選手名</label><input type="text" name="selfFront" required></div>
           <div class="field"><label>後衛の選手名</label><input type="text" name="selfBack" required></div>
+          <div class="field"><label>前衛の選手名</label><input type="text" name="selfFront" required></div>
+          <div class="field">
+            <label>サーブする選手</label>
+            <label><input type="radio" name="selfServerPosition" value="back" checked> 後衛</label>
+            <label><input type="radio" name="selfServerPosition" value="front"> 前衛</label>
+          </div>
         </fieldset>
         <fieldset>
           <legend>相手チーム</legend>
-          <div class="field"><label>前衛の選手名</label><input type="text" name="oppFront" required></div>
           <div class="field"><label>後衛の選手名</label><input type="text" name="oppBack" required></div>
+          <div class="field"><label>前衛の選手名</label><input type="text" name="oppFront" required></div>
+          <div class="field">
+            <label>サーブする選手</label>
+            <label><input type="radio" name="oppServerPosition" value="back" checked> 後衛</label>
+            <label><input type="radio" name="oppServerPosition" value="front"> 前衛</label>
+          </div>
         </fieldset>
-        <p style="font-size:0.85rem;color:var(--gray)">※前衛・後衛は試合中固定として扱います。サーブは常に後衛の選手が行うものとして自動表示します。</p>
+        <p style="font-size:0.85rem;color:var(--gray)">※前衛・後衛および各チームのサーブ担当選手は試合中固定として扱います（ゲームごとの交代はありません）。</p>
         <fieldset>
           <legend>先攻サーブ</legend>
           <div class="field">
@@ -79,8 +89,8 @@ function renderSetup() {
     e.preventDefault();
     const fd = new FormData(e.target);
     const match = createMatch({
-      self: { front: fd.get('selfFront').trim(), back: fd.get('selfBack').trim() },
-      opponent: { front: fd.get('oppFront').trim(), back: fd.get('oppBack').trim() },
+      self: { front: fd.get('selfFront').trim(), back: fd.get('selfBack').trim(), serverPosition: fd.get('selfServerPosition') },
+      opponent: { front: fd.get('oppFront').trim(), back: fd.get('oppBack').trim(), serverPosition: fd.get('oppServerPosition') },
       firstServer: fd.get('firstServer'),
     });
     location.hash = `#/match/${match.id}`;

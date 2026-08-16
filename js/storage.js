@@ -40,7 +40,7 @@ export function generateId() {
   return `m_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function createMatch({ self, opponent, firstServer }) {
+export function createMatch({ self, opponent, firstServer, matchFormat }) {
   const match = {
     id: generateId(),
     createdAt: new Date().toISOString(),
@@ -48,6 +48,7 @@ export function createMatch({ self, opponent, firstServer }) {
     self,
     opponent,
     firstServer,
+    matchFormat,
     pointLog: [],
   };
   saveMatch(match);

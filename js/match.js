@@ -1,4 +1,4 @@
-import { deriveState, reasonOptions, other, serverPositionOf, AUTO_POSITION_SHOT_TYPES } from './rules.js';
+import { deriveState, reasonOptions, other, activeServePosition, AUTO_POSITION_SHOT_TYPES, DEFAULT_MATCH_FORMAT } from './rules.js';
 import { saveMatch } from './storage.js';
 import { shell, escapeHtml } from './ui.js';
 
@@ -44,7 +44,7 @@ export function renderMatchScreen(app, initialMatch) {
     addPoint({
       winner: other(server),
       reason: { shotType: 'double_fault', outcome: 'error', agentTeam: server },
-      actingPlayerKey: serverPositionOf(match, server),
+      actingPlayerKey: activeServePosition(match, server, state.currentGame.server, state.currentGame.isFinalGame, state.currentGame.points.length),
       serveType: '2nd',
       server,
     });
@@ -61,7 +61,7 @@ export function renderMatchScreen(app, initialMatch) {
       addPoint({
         winner: pendingWinner,
         reason,
-        actingPlayerKey: serverPositionOf(match, reason.agentTeam),
+        actingPlayerKey: activeServePosition(match, reason.agentTeam, state.currentGame.server, state.currentGame.isFinalGame, state.currentGame.points.length),
         serveType: servePhase,
         server: state.currentServer,
       });
@@ -106,7 +106,7 @@ export function renderMatchScreen(app, initialMatch) {
   function renderServePositionChoice(state) {
     const side = state.currentServer;
     const team = side === 'self' ? match.self : match.opponent;
-    const teamName = side === 'self' ? '自チーム' : '相手チーム';
+    const teamName = side === 'self' ? '自ペア' : '相手ペア';
 
     shell(app, {
       title: `${escapeHtml(match.self.front)}組 vs ${escapeHtml(match.opponent.front)}組`,
@@ -115,7 +115,7 @@ export function renderMatchScreen(app, initialMatch) {
       bodyHtml: `
         <div class="card">
           <div class="game-status">
-            第${state.currentGame.gameNumber}ゲーム（ゲームカウント ${state.gameCountSelf} - ${state.gameCountOpponent}）
+            第${state.currentGame.gameNumber}ゲーム（${match.matchFormat ?? DEFAULT_MATCH_FORMAT}ゲームマッチ・ゲームカウント ${state.gameCountSelf} - ${state.gameCountOpponent}）
           </div>
           <div class="serve-status">
             ${escapeHtml(teamName)}（${escapeHtml(teamLabel(side))}）が最初にサーブします。<br>
@@ -164,13 +164,13 @@ export function renderMatchScreen(app, initialMatch) {
         </div>
         <button class="fault-btn btn-block" id="btn-fault">サーブフォルト</button>
         <div class="win-buttons">
-          <button class="self-btn" id="btn-win-self">自チーム得点</button>
-          <button class="opponent-btn" id="btn-win-opp">相手チーム得点</button>
+          <button class="self-btn" id="btn-win-self">自ペア得点</button>
+          <button class="opponent-btn" id="btn-win-opp">相手ペア得点</button>
         </div>
       `;
     } else if (pendingReason === null) {
       const options = reasonOptions(pendingWinner, state.currentServer);
-      const label = pendingWinner === 'self' ? '自チームの得点' : '相手チームの得点';
+      const label = pendingWinner === 'self' ? '自ペアの得点' : '相手ペアの得点';
       actionHtml = `
         <div class="serve-status">${label} — 決まり方を選択してください</div>
         <div class="category-grid">
@@ -182,7 +182,7 @@ export function renderMatchScreen(app, initialMatch) {
       render.currentOptions = options;
     } else {
       const team = pendingReason.agentTeam === 'self' ? match.self : match.opponent;
-      const teamName = pendingReason.agentTeam === 'self' ? '自チーム' : '相手チーム';
+      const teamName = pendingReason.agentTeam === 'self' ? '自ペア' : '相手ペア';
       actionHtml = `
         <div class="serve-status">${escapeHtml(pendingReason.label)} — ${escapeHtml(teamName)}のどちらの選手が行いましたか？</div>
         <div class="win-buttons">
@@ -200,17 +200,17 @@ export function renderMatchScreen(app, initialMatch) {
       bodyHtml: `
         <div class="card">
           <div class="game-status">
-            第${state.currentGame.gameNumber}ゲーム（ゲームカウント ${state.gameCountSelf} - ${state.gameCountOpponent}）
+            第${state.currentGame.gameNumber}ゲーム（${match.matchFormat ?? DEFAULT_MATCH_FORMAT}ゲームマッチ・ゲームカウント ${state.gameCountSelf} - ${state.gameCountOpponent}）
           </div>
           ${banner}
           <div class="scoreboard">
             <div class="side ${state.currentServer === 'self' ? 'serving' : ''}">
-              <div class="name">自チーム</div>
+              <div class="name">自ペア</div>
               <div class="score">${state.currentGame.scoreSelf}</div>
             </div>
             <div class="sep">-</div>
             <div class="side ${state.currentServer === 'opponent' ? 'serving' : ''}">
-              <div class="name">相手チーム</div>
+              <div class="name">相手ペア</div>
               <div class="score">${state.currentGame.scoreOpponent}</div>
             </div>
           </div>

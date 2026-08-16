@@ -1,5 +1,6 @@
 import { listMatches, createMatch, deleteMatch, getMatch } from './storage.js';
 import { shell, escapeHtml } from './ui.js';
+import { MATCH_FORMATS, DEFAULT_MATCH_FORMAT } from './rules.js';
 import { renderMatchScreen } from './match.js';
 import { renderSheetScreen } from './sheet.js';
 
@@ -53,21 +54,32 @@ function renderSetup() {
     bodyHtml: `
       <form class="card" id="setup-form">
         <fieldset>
-          <legend>自チーム</legend>
+          <legend>自ペア</legend>
           <div class="field"><label>後衛の選手名</label><input type="text" name="selfBack" required></div>
           <div class="field"><label>前衛の選手名</label><input type="text" name="selfFront" required></div>
         </fieldset>
         <fieldset>
-          <legend>相手チーム</legend>
+          <legend>相手ペア</legend>
           <div class="field"><label>後衛の選手名</label><input type="text" name="oppBack" required></div>
           <div class="field"><label>前衛の選手名</label><input type="text" name="oppFront" required></div>
         </fieldset>
         <p style="font-size:0.85rem;color:var(--gray)">※前衛・後衛は試合中固定として扱います。各ペアがサーブする選手（前衛/後衛）は、それぞれ最初にサーブを打つ場面（1ゲーム目・2ゲーム目の開始時）で記録画面から選択します。</p>
         <fieldset>
+          <legend>マッチ形式</legend>
+          <div class="field">
+            ${MATCH_FORMATS.map((f) => `
+              <label>
+                <input type="radio" name="matchFormat" value="${f}" ${f === DEFAULT_MATCH_FORMAT ? 'checked' : ''}>
+                ${f}ゲームマッチ
+              </label>
+            `).join('')}
+          </div>
+        </fieldset>
+        <fieldset>
           <legend>先攻サーブ</legend>
           <div class="field">
-            <label><input type="radio" name="firstServer" value="self" checked> 自チーム</label>
-            <label><input type="radio" name="firstServer" value="opponent"> 相手チーム</label>
+            <label><input type="radio" name="firstServer" value="self" checked> 自ペア</label>
+            <label><input type="radio" name="firstServer" value="opponent"> 相手ペア</label>
           </div>
         </fieldset>
         <button type="submit" class="btn-primary btn-block">記録を開始</button>
@@ -82,6 +94,7 @@ function renderSetup() {
       self: { front: fd.get('selfFront').trim(), back: fd.get('selfBack').trim() },
       opponent: { front: fd.get('oppFront').trim(), back: fd.get('oppBack').trim() },
       firstServer: fd.get('firstServer'),
+      matchFormat: Number(fd.get('matchFormat')),
     });
     location.hash = `#/match/${match.id}`;
   });

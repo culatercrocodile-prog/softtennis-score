@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveState, GAMES_TO_WIN_MATCH } from './js/rules.js';
+import { deriveState, gamesToWinMatch, serverTeamForPoint, activeServePosition } from './js/rules.js';
 
 function baseMatch(overrides = {}) {
   return {
@@ -24,7 +24,7 @@ function points(winners, server = 'self') {
   }));
 }
 
-test('4-0で自チームが1ゲーム先取する', () => {
+test('4-0で自ペアが1ゲーム先取する', () => {
   const match = baseMatch({ pointLog: points(['self', 'self', 'self', 'self']) });
   const state = deriveState(match);
   assert.equal(state.games.length, 1);
@@ -93,14 +93,52 @@ test('ファイナルゲームは7点先取、6-6以降は2点差が必要', () 
   assert.equal(state.matchWinner, 'self');
 });
 
-test('4ゲーム先取（3-3にならないケース）で試合が終了する', () => {
+test('4ゲーム先取（3-3にならないケース、デフォルトの7ゲームマッチ）で試合が終了する', () => {
   const pointLog = [];
-  for (let g = 0; g < GAMES_TO_WIN_MATCH; g += 1) pointLog.push(...points(['self', 'self', 'self', 'self']));
+  for (let g = 0; g < gamesToWinMatch(); g += 1) pointLog.push(...points(['self', 'self', 'self', 'self']));
   const match = baseMatch({ pointLog });
   const state = deriveState(match);
   assert.equal(state.isFinished, true);
   assert.equal(state.matchWinner, 'self');
   assert.equal(state.gameCountSelf, 4);
+});
+
+test('3ゲームマッチでは1-1の次がファイナルゲームになり、2ゲーム先取で終了する', () => {
+  const match = baseMatch({ matchFormat: 3, pointLog: points(['self', 'self', 'self', 'self']) });
+  let state = deriveState(match);
+  assert.equal(state.gamesToWinMatch, 2);
+  assert.equal(state.gameCountSelf, 1);
+  assert.equal(state.isFinished, false, '1ゲーム先取だけではまだ終わらない');
+
+  match.pointLog.push(...points(['opponent', 'opponent', 'opponent', 'opponent']));
+  state = deriveState(match);
+  assert.equal(state.gameCountOpponent, 1);
+  assert.equal(state.currentGame.isFinalGame, true, '1-1になったので次はファイナルゲーム');
+  assert.equal(state.pointsToWinCurrentGame, 7);
+
+  for (let i = 0; i < 7; i += 1) match.pointLog.push({ server: 'self', serveType: '1st', winner: 'self', agentTeam: 'self', shotType: 'stroke', outcome: 'decide', actingPlayerKey: 'back' });
+  state = deriveState(match);
+  assert.equal(state.isFinished, true);
+  assert.equal(state.matchWinner, 'self');
+  assert.equal(state.gameCountSelf, 2);
+});
+
+test('5ゲームマッチでは2-2の次がファイナルゲームになる', () => {
+  const pointLog = [];
+  for (let g = 0; g < 2; g += 1) pointLog.push(...points(['self', 'self', 'self', 'self']));
+  for (let g = 0; g < 2; g += 1) pointLog.push(...points(['opponent', 'opponent', 'opponent', 'opponent']));
+  const match = baseMatch({ matchFormat: 5, pointLog });
+  const state = deriveState(match);
+  assert.equal(state.gamesToWinMatch, 3);
+  assert.equal(state.gameCountSelf, 2);
+  assert.equal(state.gameCountOpponent, 2);
+  assert.equal(state.currentGame.isFinalGame, true);
+});
+
+test('matchFormatを指定しない場合は従来通り7ゲームマッチ（4ゲーム先取）として扱われる', () => {
+  const match = baseMatch({ pointLog: [] });
+  const state = deriveState(match);
+  assert.equal(state.gamesToWinMatch, 4);
 });
 
 test('サーブ側はゲームごとに交互に交代する', () => {
@@ -121,7 +159,7 @@ test('ダブルフォルトを含むポイントも通常通り集計される',
   assert.equal(state.games[0].scoreOpponent, 1);
 });
 
-test('サーブする選手はチームごとに指定したポジション（後衛）で自動判定される', () => {
+test('サーブする選手はペアごとに指定したポジション（後衛）で自動判定される', () => {
   const match = baseMatch({ pointLog: [] });
   const state = deriveState(match);
   assert.equal(state.currentServer, 'self');
@@ -148,4 +186,48 @@ test('serverPositionが未指定の場合はcurrentServerPositionがnullにな�
   const state = deriveState(match);
   assert.equal(state.currentServerPosition, null);
   assert.equal(state.currentServerPlayerName, null);
+});
+
+test('通常ゲームではサーブ側チームはゲームを通して固定される（回転しない）', () => {
+  for (let i = 0; i < 6; i += 1) {
+    assert.equal(serverTeamForPoint('self', false, i), 'self');
+  }
+});
+
+test('ファイナルゲームでは2ポイントごとに「自ペア→相手ペア→自ペアの別選手→相手ペアの別選手」の順でサーブが回る', () => {
+  const match = baseMatch({});
+  // gameServer='self' から始まるファイナルゲームを想定
+  const expectedTeams = ['self', 'self', 'opponent', 'opponent', 'self', 'self', 'opponent', 'opponent', 'self', 'self'];
+  const expectedPositions = ['back', 'back', 'back', 'back', 'front', 'front', 'front', 'front', 'back', 'back'];
+  expectedTeams.forEach((team, i) => {
+    const actualTeam = serverTeamForPoint('self', true, i);
+    assert.equal(actualTeam, team, `point index ${i} の サーブ側チーム`);
+    const actualPosition = activeServePosition(match, actualTeam, 'self', true, i);
+    assert.equal(actualPosition, expectedPositions[i], `point index ${i} の サーブポジション`);
+  });
+});
+
+test('ファイナルゲームの回転は実際の試合進行（deriveState）でも反映される', () => {
+  const match = baseMatch({ matchFormat: 3 });
+  match.pointLog.push(...points(['self', 'self', 'self', 'self'])); // game1: selfが4-0
+  match.pointLog.push(...points(['opponent', 'opponent', 'opponent', 'opponent'])); // game2: opponentが4-0 -> 1-1
+  let state = deriveState(match);
+  assert.equal(state.currentGame.isFinalGame, true);
+  assert.equal(state.currentGame.server, 'self', 'ファイナルゲームの最初のサーブ順は通常通りゲーム2の次のチーム');
+  assert.equal(state.currentServer, 'self');
+  assert.equal(state.currentServerPosition, 'back');
+
+  // 2ポイント消化 → 相手ペアの後衛に交代
+  match.pointLog.push({ server: 'self', serveType: '1st', winner: 'self', agentTeam: 'self', shotType: 'stroke', outcome: 'decide', actingPlayerKey: 'back' });
+  match.pointLog.push({ server: 'self', serveType: '1st', winner: 'self', agentTeam: 'self', shotType: 'stroke', outcome: 'decide', actingPlayerKey: 'back' });
+  state = deriveState(match);
+  assert.equal(state.currentServer, 'opponent');
+  assert.equal(state.currentServerPosition, 'back');
+
+  // さらに2ポイント消化 → 自ペアの前衛（別選手）に交代
+  match.pointLog.push({ server: 'opponent', serveType: '1st', winner: 'opponent', agentTeam: 'opponent', shotType: 'stroke', outcome: 'decide', actingPlayerKey: 'back' });
+  match.pointLog.push({ server: 'opponent', serveType: '1st', winner: 'opponent', agentTeam: 'opponent', shotType: 'stroke', outcome: 'decide', actingPlayerKey: 'back' });
+  state = deriveState(match);
+  assert.equal(state.currentServer, 'self');
+  assert.equal(state.currentServerPosition, 'front');
 });

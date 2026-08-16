@@ -1,4 +1,4 @@
-import { deriveState, other } from './rules.js';
+import { deriveState, other, DEFAULT_MATCH_FORMAT } from './rules.js';
 import { shell, escapeHtml } from './ui.js';
 
 const SHOT_TYPE_NAMES = {
@@ -103,17 +103,17 @@ function breakdownTable(points, match, team) {
 }
 
 function toCsv(match, games) {
-  const header = ['ゲーム', '第何ポイント', 'サーブ', 'サーブ種別', '得点/失点', '決まり方チーム', '決まり方', '決め/ミス', '実行選手', 'ポジション'];
+  const header = ['ゲーム', '第何ポイント', 'サーブ', 'サーブ種別', '得点/失点', '決まり方ペア', '決まり方', '決め/ミス', '実行選手', 'ポジション'];
   const rows = [header];
   games.forEach((g) => {
     g.points.forEach((p, i) => {
       rows.push([
         g.gameNumber,
         i + 1,
-        p.server === 'self' ? '自チーム' : '相手チーム',
+        p.server === 'self' ? '自ペア' : '相手ペア',
         p.serveType,
-        p.winner === 'self' ? '自チーム得点' : '相手チーム得点',
-        p.agentTeam === 'self' ? '自チーム' : '相手チーム',
+        p.winner === 'self' ? '自ペア得点' : '相手ペア得点',
+        p.agentTeam === 'self' ? '自ペア' : '相手ペア',
         SHOT_TYPE_NAMES[p.shotType] ?? p.shotType,
         p.outcome === 'decide' ? '決め' : 'ミス',
         playerName(match, p.agentTeam, p.actingPlayerKey),
@@ -137,8 +137,8 @@ function downloadBlob(filename, content, mime) {
 }
 
 function teamStatsHtml(match, team, stats) {
-  const label = team === 'self' ? '自チーム' : '相手チーム';
-  const oppLabel = team === 'self' ? '相手チーム' : '自チーム';
+  const label = team === 'self' ? '自ペア' : '相手ペア';
+  const oppLabel = team === 'self' ? '相手ペア' : '自ペア';
   return `
     <div class="card">
       <h3>${label}の成績（${escapeHtml(teamName(match, team))}）</h3>
@@ -183,13 +183,13 @@ export function renderSheetScreen(app, match) {
   const gameRows = games.map((g) => `
     <tr>
       <td>${g.gameNumber}${g.isFinalGame ? '（F）' : ''}</td>
-      <td>${g.server === 'self' ? '自チーム' : '相手チーム'}</td>
+      <td>${g.server === 'self' ? '自ペア' : '相手ペア'}</td>
       <td>${g.scoreSelf} - ${g.scoreOpponent}</td>
-      <td>${g.inProgress ? '進行中' : (g.winner === 'self' ? '自チーム' : '相手チーム')}</td>
+      <td>${g.inProgress ? '進行中' : (g.winner === 'self' ? '自ペア' : '相手ペア')}</td>
     </tr>`).join('');
 
   const resultLine = state.isFinished
-    ? `<strong>${state.matchWinner === 'self' ? '自チームの勝利' : '相手チームの勝利'}</strong>（ゲームカウント ${state.gameCountSelf} - ${state.gameCountOpponent}）`
+    ? `<strong>${state.matchWinner === 'self' ? '自ペアの勝利' : '相手ペアの勝利'}</strong>（ゲームカウント ${state.gameCountSelf} - ${state.gameCountOpponent}）`
     : `試合進行中（ゲームカウント ${state.gameCountSelf} - ${state.gameCountOpponent}）`;
 
   shell(app, {
@@ -197,26 +197,29 @@ export function renderSheetScreen(app, match) {
     backHref: match.status === 'finished' ? '#/' : `#/match/${match.id}`,
     actionsHtml: match.status !== 'finished' ? `<button data-nav="#/match/${match.id}">記録へ戻る</button>` : '',
     bodyHtml: `
-      <div class="card">
-        <h2>${escapeHtml(teamName(match, 'self'))}（自チーム） vs ${escapeHtml(teamName(match, 'opponent'))}（相手チーム）</h2>
-        <p>${dateStr}　${resultLine}</p>
-      </div>
+      <div id="sheet-content">
+        <div class="card">
+          <h2>${escapeHtml(teamName(match, 'self'))}（自ペア） vs ${escapeHtml(teamName(match, 'opponent'))}（相手ペア）</h2>
+          <p>${dateStr}　${match.matchFormat ?? DEFAULT_MATCH_FORMAT}ゲームマッチ　${resultLine}</p>
+        </div>
 
-      <div class="card">
-        <h3>ゲーム経過</h3>
-        <table class="sheet-table">
-          <thead><tr><th>ゲーム</th><th>サーブ</th><th>スコア（自-相手）</th><th>勝者</th></tr></thead>
-          <tbody>${gameRows}</tbody>
-        </table>
-      </div>
+        <div class="card">
+          <h3>ゲーム経過</h3>
+          <table class="sheet-table">
+            <thead><tr><th>ゲーム</th><th>サーブ</th><th>スコア（自-相手）</th><th>勝者</th></tr></thead>
+            <tbody>${gameRows}</tbody>
+          </table>
+        </div>
 
-      ${teamStatsHtml(match, 'self', selfStats)}
-      ${teamStatsHtml(match, 'opponent', opponentStats)}
+        ${teamStatsHtml(match, 'self', selfStats)}
+        ${teamStatsHtml(match, 'opponent', opponentStats)}
+      </div>
 
       <div class="card no-print">
         <h3>出力</h3>
         <div class="export-buttons">
           <button class="btn-primary" id="btn-print">印刷用PDF（印刷ダイアログ）</button>
+          <button id="btn-pdf">PDFダウンロード</button>
           <button id="btn-csv">CSVダウンロード</button>
           <button id="btn-json">JSONダウンロード</button>
         </div>
@@ -225,10 +228,49 @@ export function renderSheetScreen(app, match) {
   });
 
   document.getElementById('btn-print')?.addEventListener('click', () => window.print());
+  document.getElementById('btn-pdf')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-pdf');
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '生成中…';
+    try {
+      await downloadSheetPdf(match);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  });
   document.getElementById('btn-csv')?.addEventListener('click', () => {
     downloadBlob(`softtennis_${match.id}.csv`, `﻿${toCsv(match, games)}`, 'text/csv;charset=utf-8');
   });
   document.getElementById('btn-json')?.addEventListener('click', () => {
     downloadBlob(`softtennis_${match.id}.json`, JSON.stringify(match, null, 2), 'application/json');
   });
+}
+
+// スコアシート画面のDOMをそのまま画像化し、A4サイズのPDFファイルとしてダウンロードする。
+// 日本語フォントをPDF側に埋め込む必要がないよう、html2canvasでラスタライズしてから
+// jsPDFに画像として貼り付ける方式を取っている。
+async function downloadSheetPdf(match) {
+  const target = document.getElementById('sheet-content');
+  const canvas = await window.html2canvas(target, { scale: 2, backgroundColor: '#ffffff' });
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const imgWidth = pageWidth;
+  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+  const imgData = canvas.toDataURL('image/png');
+
+  let heightLeft = imgHeight;
+  let position = 0;
+  pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+  heightLeft -= pageHeight;
+  while (heightLeft > 0) {
+    position -= pageHeight;
+    pdf.addPage();
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+  }
+  pdf.save(`softtennis_${match.id}.pdf`);
 }

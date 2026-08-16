@@ -56,23 +56,13 @@ function renderSetup() {
           <legend>自チーム</legend>
           <div class="field"><label>後衛の選手名</label><input type="text" name="selfBack" required></div>
           <div class="field"><label>前衛の選手名</label><input type="text" name="selfFront" required></div>
-          <div class="field">
-            <label>サーブする選手</label>
-            <label><input type="radio" name="selfServerPosition" value="back" checked> 後衛</label>
-            <label><input type="radio" name="selfServerPosition" value="front"> 前衛</label>
-          </div>
         </fieldset>
         <fieldset>
           <legend>相手チーム</legend>
           <div class="field"><label>後衛の選手名</label><input type="text" name="oppBack" required></div>
           <div class="field"><label>前衛の選手名</label><input type="text" name="oppFront" required></div>
-          <div class="field">
-            <label>サーブする選手</label>
-            <label><input type="radio" name="oppServerPosition" value="back" checked> 後衛</label>
-            <label><input type="radio" name="oppServerPosition" value="front"> 前衛</label>
-          </div>
         </fieldset>
-        <p style="font-size:0.85rem;color:var(--gray)">※前衛・後衛および各チームのサーブ担当選手は試合中固定として扱います（ゲームごとの交代はありません）。</p>
+        <p style="font-size:0.85rem;color:var(--gray)">※前衛・後衛は試合中固定として扱います。各ペアがサーブする選手（前衛/後衛）は、それぞれ最初にサーブを打つ場面（1ゲーム目・2ゲーム目の開始時）で記録画面から選択します。</p>
         <fieldset>
           <legend>先攻サーブ</legend>
           <div class="field">
@@ -89,8 +79,8 @@ function renderSetup() {
     e.preventDefault();
     const fd = new FormData(e.target);
     const match = createMatch({
-      self: { front: fd.get('selfFront').trim(), back: fd.get('selfBack').trim(), serverPosition: fd.get('selfServerPosition') },
-      opponent: { front: fd.get('oppFront').trim(), back: fd.get('oppBack').trim(), serverPosition: fd.get('oppServerPosition') },
+      self: { front: fd.get('selfFront').trim(), back: fd.get('selfBack').trim() },
+      opponent: { front: fd.get('oppFront').trim(), back: fd.get('oppBack').trim() },
       firstServer: fd.get('firstServer'),
     });
     location.hash = `#/match/${match.id}`;

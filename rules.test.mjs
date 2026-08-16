@@ -140,12 +140,12 @@ test('サーブ担当選手を前衛に指定した場合はその選手が自�
   assert.equal(state.currentServerPlayerName, '自前衛');
 });
 
-test('serverPositionが未指定の場合は後衛にフォールバックする（後方互換）', () => {
+test('serverPositionが未指定の場合はcurrentServerPositionがnullになり、選手選択が必要なことを示す', () => {
   const match = baseMatch({
     self: { front: '自前衛', back: '自後衛' },
     pointLog: [],
   });
   const state = deriveState(match);
-  assert.equal(state.currentServerPosition, 'back');
-  assert.equal(state.currentServerPlayerName, '自後衛');
+  assert.equal(state.currentServerPosition, null);
+  assert.equal(state.currentServerPlayerName, null);
 });

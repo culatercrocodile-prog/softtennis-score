@@ -10,11 +10,12 @@ export function other(side) {
   return side === 'self' ? 'opponent' : 'self';
 }
 
-// side ('self'|'opponent') のチームであらかじめ指定された、サーブ/レシーブを
-// 担当する選手のポジション ('front'|'back') を返す。
+// side ('self'|'opponent') のチームで指定された、サーブ/レシーブを
+// 担当する選手のポジション ('front'|'back') を返す。まだ選手が選択されていない
+// 場合は null を返す（記録画面でその都度選んでもらう必要がある）。
 export function serverPositionOf(match, side) {
   const team = side === 'self' ? match.self : match.opponent;
-  return team.serverPosition || 'back';
+  return team.serverPosition ?? null;
 }
 
 // --- 決まり方（ショットの種類 × 決めた/ミスした × どちらのチームが行ったか） ---
@@ -149,8 +150,10 @@ export function deriveState(match) {
       };
 
   // 各チームで指定されたサーブ担当選手（前衛 or 後衛）が常にサーブするという前提で自動判定する。
+  // そのチームがまだ一度もサーブしておらず選手が未選択の場合は currentServerPosition が null になり、
+  // 記録画面側でその選手を選ぶよう促す必要がある。
   const currentServerTeam = isFinished ? null : (server === 'self' ? match.self : match.opponent);
-  const currentServerPosition = currentServerTeam ? (currentServerTeam.serverPosition || 'back') : null;
+  const currentServerPosition = currentServerTeam ? (currentServerTeam.serverPosition ?? null) : null;
 
   return {
     games,
@@ -161,7 +164,7 @@ export function deriveState(match) {
     isFinished,
     currentServer: isFinished ? null : server,
     currentServerPosition,
-    currentServerPlayerName: isFinished ? null : currentServerTeam[currentServerPosition],
+    currentServerPlayerName: (isFinished || !currentServerPosition) ? null : currentServerTeam[currentServerPosition],
     pointsToWinCurrentGame: isFinished ? null : (isFinalGame ? POINTS_TO_WIN_FINAL_GAME : POINTS_TO_WIN_GAME),
   };
 }

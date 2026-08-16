@@ -81,6 +81,13 @@ export function renderMatchScreen(app, initialMatch) {
     });
   }
 
+  function handleServePosition(side, position) {
+    const team = side === 'self' ? match.self : match.opponent;
+    team.serverPosition = position;
+    persist();
+    render();
+  }
+
   function handleUndo() {
     if (match.pointLog.length === 0) return;
     match.pointLog.pop();
@@ -96,6 +103,36 @@ export function renderMatchScreen(app, initialMatch) {
     return `${team.front}・${team.back}`;
   }
 
+  function renderServePositionChoice(state) {
+    const side = state.currentServer;
+    const team = side === 'self' ? match.self : match.opponent;
+    const teamName = side === 'self' ? '自チーム' : '相手チーム';
+
+    shell(app, {
+      title: `${escapeHtml(match.self.front)}組 vs ${escapeHtml(match.opponent.front)}組`,
+      backHref: '#/',
+      actionsHtml: `<button data-nav="#/sheet/${match.id}">シート</button>`,
+      bodyHtml: `
+        <div class="card">
+          <div class="game-status">
+            第${state.currentGame.gameNumber}ゲーム（ゲームカウント ${state.gameCountSelf} - ${state.gameCountOpponent}）
+          </div>
+          <div class="serve-status">
+            ${escapeHtml(teamName)}（${escapeHtml(teamLabel(side))}）が最初にサーブします。<br>
+            この試合を通してサーブ（およびレシーブ）を担当する選手を選んでください。
+          </div>
+          <div class="win-buttons">
+            <button id="btn-serve-pos-back">${escapeHtml(team.back)}（後衛）</button>
+            <button id="btn-serve-pos-front">${escapeHtml(team.front)}（前衛）</button>
+          </div>
+        </div>
+      `,
+    });
+
+    document.getElementById('btn-serve-pos-back')?.addEventListener('click', () => handleServePosition(side, 'back'));
+    document.getElementById('btn-serve-pos-front')?.addEventListener('click', () => handleServePosition(side, 'front'));
+  }
+
   function render() {
     const state = deriveState(match);
 
@@ -106,6 +143,11 @@ export function renderMatchScreen(app, initialMatch) {
         persist();
       }
       location.hash = `#/sheet/${match.id}`;
+      return;
+    }
+
+    if (!state.currentServerPosition) {
+      renderServePositionChoice(state);
       return;
     }
 

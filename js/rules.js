@@ -100,7 +100,8 @@ export function reasonOptions(winner, server) {
   list.push({ shotType: 'volley', outcome: 'decide', agentTeam: winner });
   list.push({ shotType: 'smash', outcome: 'decide', agentTeam: winner });
   list.push({ shotType: 'stroke', outcome: 'decide', agentTeam: winner });
-  list.push({ shotType: 'receive', outcome: 'error', agentTeam: loser });
+  // レシーブミスはレシーブ側（サーブしていない側）が失点した場合にのみ選択肢に出す。
+  if (server === winner) list.push({ shotType: 'receive', outcome: 'error', agentTeam: loser });
   list.push({ shotType: 'volley', outcome: 'error', agentTeam: loser });
   list.push({ shotType: 'smash', outcome: 'error', agentTeam: loser });
   list.push({ shotType: 'stroke', outcome: 'error', agentTeam: loser });

@@ -1,4 +1,4 @@
-import { deriveState, other, DEFAULT_MATCH_FORMAT } from './rules.js';
+import { deriveState, other, activeServePosition, DEFAULT_MATCH_FORMAT } from './rules.js';
 import { shell, escapeHtml } from './ui.js';
 
 const SHOT_TYPE_NAMES = {
@@ -33,9 +33,38 @@ function playerName(match, team, positionKey) {
   return '不明';
 }
 
-export function computeTeamStats(match, team) {
+// ポイントログの各ポイントについて、そのポイントで実際にサーブした選手のポジション
+// （'front'|'back'）を求め、ポイントをキーにしたMapで返す（ファイナルゲームの
+// サーブ回転を考慮するため、deriveStateが導出したゲーム単位の情報が必要）。
+function computeServerPositions(match, state) {
+  const map = new Map();
+  flattenGames(state).forEach((g) => {
+    g.points.forEach((p, i) => {
+      map.set(p, activeServePosition(match, p.server, g.server, g.isFinalGame, i));
+    });
+  });
+  return map;
+}
+
+function playerServiceStats(team, log, serverPosMap) {
+  const teamServe = log.filter((p) => p.server === team);
+  const stats = {};
+  ['front', 'back'].forEach((pos) => {
+    const pts = teamServe.filter((p) => serverPosMap.get(p) === pos);
+    const firstIn = pts.filter((p) => p.serveType === '1st');
+    stats[pos] = {
+      total: pts.length,
+      firstInRate: rate(firstIn.length, pts.length), firstInDen: pts.length,
+      doubleFaultCount: pts.filter((p) => p.shotType === 'double_fault').length,
+    };
+  });
+  return stats;
+}
+
+export function computeTeamStats(match, team, state) {
   const opp = other(team);
   const log = match.pointLog;
+  const serverPosMap = computeServerPositions(match, state);
   const teamServe = log.filter((p) => p.server === team);
   const oppServe = log.filter((p) => p.server === opp);
   const teamServe1st = teamServe.filter((p) => p.serveType === '1st');
@@ -52,10 +81,9 @@ export function computeTeamStats(match, team) {
   return {
     service: {
       total: teamServe.length,
-      firstInRate: rate(teamServe1st.length, teamServe.length), firstInDen: teamServe.length,
       firstWinRate: rate(teamServe1st.filter((p) => p.winner === team).length, teamServe1st.length), firstWinDen: teamServe1st.length,
       secondWinRate: rate(teamServe2nd.filter((p) => p.winner === team).length, teamServe2nd.length), secondWinDen: teamServe2nd.length,
-      doubleFaultRate: rate(teamServe2nd.filter((p) => p.shotType === 'double_fault').length, teamServe2nd.length), doubleFaultDen: teamServe2nd.length,
+      players: playerServiceStats(team, log, serverPosMap),
     },
     receive: {
       total: oppServe.length,
@@ -136,6 +164,24 @@ function downloadBlob(filename, content, mime) {
   URL.revokeObjectURL(url);
 }
 
+function playerServiceStatsTable(match, team, players) {
+  const t = team === 'self' ? match.self : match.opponent;
+  const rows = ['front', 'back'].map((pos) => {
+    const s = players[pos];
+    return `
+      <tr>
+        <td>${escapeHtml(t[pos])}（${pos === 'front' ? '前衛' : '後衛'}）</td>
+        <td>${fmtRate(s.firstInRate, s.firstInDen)}</td>
+        <td>${s.doubleFaultCount}件</td>
+      </tr>`;
+  }).join('');
+  return `
+    <table class="sheet-table">
+      <thead><tr><th>選手</th><th>1stサーブ成功率</th><th>ダブルフォルト数</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
 function teamStatsHtml(match, team, stats) {
   const label = team === 'self' ? '自ペア' : '相手ペア';
   const oppLabel = team === 'self' ? '相手ペア' : '自ペア';
@@ -144,11 +190,11 @@ function teamStatsHtml(match, team, stats) {
       <h3>${label}の成績（${escapeHtml(teamName(match, team))}）</h3>
       <p><strong>サービスゲーム時</strong>（${label}のサーブ、${stats.service.total}本）</p>
       <div class="stat-grid">
-        <div class="stat-box"><div class="label">1stサーブ成功率</div><div class="value">${fmtRate(stats.service.firstInRate, stats.service.firstInDen)}</div></div>
         <div class="stat-box"><div class="label">1stサーブ時のポイント取得率</div><div class="value">${fmtRate(stats.service.firstWinRate, stats.service.firstWinDen)}</div></div>
         <div class="stat-box"><div class="label">2ndサーブ時のポイント取得率</div><div class="value">${fmtRate(stats.service.secondWinRate, stats.service.secondWinDen)}</div></div>
-        <div class="stat-box"><div class="label">ダブルフォルト率</div><div class="value">${fmtRate(stats.service.doubleFaultRate, stats.service.doubleFaultDen)}</div></div>
       </div>
+      <p>選手別サーブ成績</p>
+      ${playerServiceStatsTable(match, team, stats.service.players)}
       <p><strong>レシーブゲーム時</strong>（${oppLabel}のサーブ、${stats.receive.total}本）</p>
       <div class="stat-grid">
         <div class="stat-box"><div class="label">${oppLabel}の1stサーブ時のポイント取得率</div><div class="value">${fmtRate(stats.receive.firstWinRate, stats.receive.firstWinDen)}</div></div>
@@ -176,8 +222,8 @@ function teamStatsHtml(match, team, stats) {
 export function renderSheetScreen(app, match) {
   const state = deriveState(match);
   const games = flattenGames(state);
-  const selfStats = computeTeamStats(match, 'self');
-  const opponentStats = computeTeamStats(match, 'opponent');
+  const selfStats = computeTeamStats(match, 'self', state);
+  const opponentStats = computeTeamStats(match, 'opponent', state);
   const dateStr = new Date(match.createdAt).toLocaleDateString('ja-JP');
 
   const gameRows = games.map((g) => `
@@ -221,7 +267,6 @@ export function renderSheetScreen(app, match) {
           <button class="btn-primary" id="btn-print">印刷用PDF（印刷ダイアログ）</button>
           <button id="btn-pdf">PDFダウンロード</button>
           <button id="btn-csv">CSVダウンロード</button>
-          <button id="btn-json">JSONダウンロード</button>
         </div>
       </div>
     `,
@@ -242,9 +287,6 @@ export function renderSheetScreen(app, match) {
   });
   document.getElementById('btn-csv')?.addEventListener('click', () => {
     downloadBlob(`softtennis_${match.id}.csv`, `﻿${toCsv(match, games)}`, 'text/csv;charset=utf-8');
-  });
-  document.getElementById('btn-json')?.addEventListener('click', () => {
-    downloadBlob(`softtennis_${match.id}.json`, JSON.stringify(match, null, 2), 'application/json');
   });
 }
 

@@ -1,6 +1,6 @@
 // アセット内容を変更した場合は必ずこの値を更新すること。
 // cache-first戦略のため、名前を変えないとインストール済みのユーザーに更新が届かない。
-const CACHE_NAME = 'softtennis-score-v5';
+const CACHE_NAME = 'softtennis-score-v6';
 const ASSETS = [
   './',
   './index.html',

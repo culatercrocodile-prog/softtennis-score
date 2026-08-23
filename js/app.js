@@ -16,7 +16,7 @@ function renderList() {
     const target = m.status === 'finished' ? `#/sheet/${m.id}` : `#/match/${m.id}`;
     return `
       <li>
-        <a href="${target}">${escapeHtml(m.self.front)}・${escapeHtml(m.self.back)} vs ${escapeHtml(m.opponent.front)}・${escapeHtml(m.opponent.back)}</a>
+        <a href="${target}">${escapeHtml(m.self.back)}・${escapeHtml(m.self.front)} vs ${escapeHtml(m.opponent.back)}・${escapeHtml(m.opponent.front)}</a>
         <span>${dateStr} ${statusBadge}</span>
         <button class="no-print" data-del="${m.id}" title="削除">🗑</button>
       </li>`;

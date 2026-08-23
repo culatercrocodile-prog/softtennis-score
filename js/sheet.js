@@ -1,12 +1,14 @@
 import { deriveState, other, activeServePosition, DEFAULT_MATCH_FORMAT } from './rules.js';
-import { shell, escapeHtml } from './ui.js';
+import { shell, escapeHtml, isLineInAppBrowser } from './ui.js';
 
 const SHOT_TYPE_NAMES = {
   ace: 'サービスエース',
+  receive_ace: 'レシーブエース',
   volley: 'ボレー',
   smash: 'スマッシュ',
   stroke: 'ストローク',
   receive: 'レシーブ',
+  // out/net/otherは選択肢からは廃止済みだが、過去に記録されたデータの表示のために残す。
   out: 'アウト',
   net: 'ネット',
   double_fault: 'ダブルフォルト',
@@ -23,7 +25,7 @@ function fmtRate(r, den) {
 
 function teamName(match, team) {
   const t = team === 'self' ? match.self : match.opponent;
-  return `${t.front}・${t.back}`;
+  return `${t.back}・${t.front}`;
 }
 
 function playerName(match, team, positionKey) {
@@ -40,7 +42,7 @@ function computeServerPositions(match, state) {
   const map = new Map();
   flattenGames(state).forEach((g) => {
     g.points.forEach((p, i) => {
-      map.set(p, activeServePosition(match, p.server, g.server, g.isFinalGame, i));
+      map.set(p, activeServePosition(match, p.server, g.server, g.rotatesBetweenPairs, i));
     });
   });
   return map;
@@ -228,7 +230,7 @@ export function renderSheetScreen(app, match) {
 
   const gameRows = games.map((g) => `
     <tr>
-      <td>${g.gameNumber}${g.isFinalGame ? '（F）' : ''}</td>
+      <td>${g.gameNumber}${g.isFinalGame ? `（F・${g.finalGameFormat ?? 7}pt）` : ''}</td>
       <td>${g.server === 'self' ? '自ペア' : '相手ペア'}</td>
       <td>${g.scoreSelf} - ${g.scoreOpponent}</td>
       <td>${g.inProgress ? '進行中' : (g.winner === 'self' ? '自ペア' : '相手ペア')}</td>
@@ -263,6 +265,12 @@ export function renderSheetScreen(app, match) {
 
       <div class="card no-print">
         <h3>出力</h3>
+        ${isLineInAppBrowser() ? `
+          <p class="warning-box">
+            LINEアプリ内のブラウザでは、印刷・PDF・CSVの保存が動作しないことがあります。<br>
+            画面右下（または右上）の「…」メニューから「他のブラウザで開く」を選んで、Safariでこのページを開いてから保存してください。
+          </p>
+        ` : ''}
         <div class="export-buttons">
           <button class="btn-primary" id="btn-print">印刷用PDF（印刷ダイアログ）</button>
           <button id="btn-pdf">PDFダウンロード</button>

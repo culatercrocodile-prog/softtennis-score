@@ -16,6 +16,12 @@ export function shell(app, { title, backHref, actionsHtml = '', bodyHtml }) {
   });
 }
 
+// LINEアプリ内蔵ブラウザ（WebView）はwindow.print()やファイルダウンロードを
+// ブロックすることが多いため、検出して案内を出す。
+export function isLineInAppBrowser() {
+  return /\bLine\//i.test(navigator.userAgent);
+}
+
 export function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',

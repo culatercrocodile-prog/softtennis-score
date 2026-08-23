@@ -9,6 +9,11 @@ export const POINTS_TO_WIN_FINAL_GAME = 7;
 export const MATCH_FORMATS = [3, 5, 7];
 export const DEFAULT_MATCH_FORMAT = 7;
 
+// ファイナルゲームの形式。7pt: 7ポイント先取・サーブは2ポイントごとに両ペア間で回転。
+// 4pt: 通常ゲームと同じく4ポイント先取・片方のペアのみがサーブする。
+export const FINAL_GAME_POINT_OPTIONS = [7, 4];
+export const DEFAULT_FINAL_GAME_POINTS = 7;
+
 // マッチ形式（3/5/7ゲームマッチ）から、勝利に必要なゲーム先取数を算出する。
 // 例: 7ゲームマッチ → 4ゲーム先取。旧データ互換のため未指定時はデフォルト形式を使う。
 export function gamesToWinMatch(matchFormat) {
@@ -23,24 +28,33 @@ function otherPosition(position) {
   return position === 'front' ? 'back' : 'front';
 }
 
-// 通常ゲームでは、そのゲームの最初のサーブ側チームがゲームを通してサーブする。
-// ファイナルゲームでは2ポイントごとに「最初のサーブ順チーム→もう一方のチーム→
-// 最初のチームの別選手→もう一方チームの別選手」の順でサーブ権が回る。
+// 通常ゲーム（および4ポイント制ファイナルゲーム）では、そのゲームの最初のサーブ側
+// チームがゲームを通してサーブする。7ポイント制ファイナルゲームでは2ポイントごとに
+// 「最初のサーブ順チーム→もう一方のチーム→最初のチームの別選手→もう一方チームの
+// 別選手」の順でサーブ権が回る。
 // gameServer: そのゲームで最初にサーブするチーム。pointIndexInGame: 0始まりのポイント番号。
-export function serverTeamForPoint(gameServer, isFinalGame, pointIndexInGame) {
-  if (!isFinalGame) return gameServer;
+// rotatesBetweenPairs: 7ポイント制ファイナルゲームかどうか（サーブ側ペア自体が回転するか）。
+export function serverTeamForPoint(gameServer, rotatesBetweenPairs, pointIndexInGame) {
+  if (!rotatesBetweenPairs) return gameServer;
   const block = Math.floor(pointIndexInGame / 2);
   return block % 2 === 0 ? gameServer : other(gameServer);
 }
 
-// side ('self'|'opponent') のペアが、通常ゲームなら指定済みの担当選手固定で、
-// ファイナルゲームなら上記の回転順に応じて、サーブ（またはレシーブ）を行う選手の
-// ポジション ('front'|'back') を返す。まだ選手が選択されていない場合は null を返す
-// （記録画面でその都度選んでもらう必要がある）。
-export function activeServePosition(match, side, gameServer, isFinalGame, pointIndexInGame) {
+// side ('self'|'opponent') のペアが、サーブ（またはレシーブ）を行う選手のポジション
+// ('front'|'back') を返す。まだ選手が選択されていない場合は null を返す（記録画面で
+// その都度選んでもらう必要がある）。
+// rotatesBetweenPairs=false（通常ゲーム・4ポイント制ファイナル）: サーブ側ペアのみ、
+// 2ポイントごとに担当選手が交代する（レシーブ側は指定済みの選手で固定）。
+// rotatesBetweenPairs=true（7ポイント制ファイナル）: 2ポイントごとに両ペア間でサーブ権
+// 自体が回転し、各ペア内でも自分たちの番が回ってくるたびに担当選手が交代する。
+export function activeServePosition(match, side, gameServer, rotatesBetweenPairs, pointIndexInGame) {
   const team = side === 'self' ? match.self : match.opponent;
   if (!team.serverPosition) return null;
-  if (!isFinalGame) return team.serverPosition;
+  if (!rotatesBetweenPairs) {
+    if (side !== gameServer) return team.serverPosition;
+    const block = Math.floor(pointIndexInGame / 2);
+    return block % 2 === 0 ? team.serverPosition : otherPosition(team.serverPosition);
+  }
   const offset = side === gameServer ? 0 : 1;
   const block = Math.floor(pointIndexInGame / 2);
   const localTurn = Math.max(0, Math.floor((block - offset) / 2));
@@ -48,17 +62,19 @@ export function activeServePosition(match, side, gameServer, isFinalGame, pointI
 }
 
 // --- 決まり方（ショットの種類 × 決めた/ミスした × どちらのペアが行ったか） ---
-// レシーブ・サービスエース・ダブルフォルトは「サーブ側/レシーブ側とも、各ペアで
-// あらかじめ指定したサーブ担当選手（前衛 or 後衛）が行う」という前提を元に、
+// レシーブ・レシーブエース・サービスエース・ダブルフォルトは「サーブ側/レシーブ側とも、
+// 各ペアであらかじめ指定したサーブ担当選手（前衛 or 後衛）が行う」という前提を元に、
 // 実行選手を自動判定できる。
-// ボレー・スマッシュ・ストローク・アウト・ネット・その他はラリー中に前衛・後衛どちらが
-// 行ったか一意に決まらないため、記録画面側で選手を選んでもらう。
-export const AUTO_POSITION_SHOT_TYPES = new Set(['ace', 'double_fault', 'receive']);
+// ボレー・スマッシュ・ストロークはラリー中に前衛・後衛どちらが行ったか一意に決まらない
+// ため、記録画面側で選手を選んでもらう。
+export const AUTO_POSITION_SHOT_TYPES = new Set(['ace', 'receive_ace', 'double_fault', 'receive']);
 
 // 自ペア/相手ペアどちらの行為かをすべてのラベルで明示し、記録者が取り違えないようにする。
 const REASON_LABELS = {
   'ace|decide|self': '自ペアのサービスエース',
   'ace|decide|opponent': '相手ペアのサービスエース',
+  'receive_ace|decide|self': '自ペアのレシーブエース',
+  'receive_ace|decide|opponent': '相手ペアのレシーブエース',
   'volley|decide|self': '自ペアのボレー決め',
   'volley|decide|opponent': '相手ペアのボレー決め',
   'volley|error|self': '自ペアのボレーミス',
@@ -96,7 +112,9 @@ export function reasonLabel(reason) {
 export function reasonOptions(winner, server) {
   const loser = other(winner);
   const list = [];
+  // サービスエースはサーブ側が勝った場合、レシーブエースはレシーブ側が勝った場合にのみ選択肢に出す。
   if (server === winner) list.push({ shotType: 'ace', outcome: 'decide', agentTeam: winner });
+  if (server !== winner) list.push({ shotType: 'receive_ace', outcome: 'decide', agentTeam: winner });
   list.push({ shotType: 'volley', outcome: 'decide', agentTeam: winner });
   list.push({ shotType: 'smash', outcome: 'decide', agentTeam: winner });
   list.push({ shotType: 'stroke', outcome: 'decide', agentTeam: winner });
@@ -105,9 +123,6 @@ export function reasonOptions(winner, server) {
   list.push({ shotType: 'volley', outcome: 'error', agentTeam: loser });
   list.push({ shotType: 'smash', outcome: 'error', agentTeam: loser });
   list.push({ shotType: 'stroke', outcome: 'error', agentTeam: loser });
-  list.push({ shotType: 'out', outcome: 'error', agentTeam: loser });
-  list.push({ shotType: 'net', outcome: 'error', agentTeam: loser });
-  list.push({ shotType: 'other', outcome: 'decide', agentTeam: winner });
   return list.map((r) => ({ ...r, label: reasonLabel(r) }));
 }
 
@@ -115,13 +130,24 @@ function isGameWon(scoreA, scoreB, target) {
   return scoreA >= target && scoreA - scoreB >= 2;
 }
 
+// isFinalGame・finalGameFormatから、そのゲームの目標ポイント数と、サーブ権がペア間で
+// 回転するかどうかを算出する。
+function finalGameRule(isFinalGame, finalGameFormat) {
+  const rotatesBetweenPairs = isFinalGame && finalGameFormat !== 4;
+  const target = rotatesBetweenPairs ? POINTS_TO_WIN_FINAL_GAME : POINTS_TO_WIN_GAME;
+  return { rotatesBetweenPairs, target };
+}
+
 // pointLog を再生し、試合の全体状態を導出する。
-// match: { self: {front, back}, opponent: {front, back}, firstServer, matchFormat, pointLog }
+// match: { self: {front, back}, opponent: {front, back}, firstServer, matchFormat,
+//          finalGameFormat, pointLog }
 export function deriveState(match) {
   const gamesToWin = gamesToWinMatch(match.matchFormat);
+  const finalGameFormat = match.finalGameFormat ?? DEFAULT_FINAL_GAME_POINTS;
   const games = [];
   let gameNumber = 1;
-  // そのゲームで最初にサーブするチーム（通常ゲームはこれが最後までサーブ側になる）。
+  // そのゲームで最初にサーブするチーム（通常ゲーム・4ポイント制ファイナルはこれが
+  // 最後までサーブ側になる）。
   let gameServer = match.firstServer;
   let scoreSelf = 0;
   let scoreOpponent = 0;
@@ -138,7 +164,7 @@ export function deriveState(match) {
     if (point.winner === 'self') scoreSelf += 1;
     else scoreOpponent += 1;
 
-    const target = isFinalGame ? POINTS_TO_WIN_FINAL_GAME : POINTS_TO_WIN_GAME;
+    const { rotatesBetweenPairs, target } = finalGameRule(isFinalGame, finalGameFormat);
     const selfWonGame = isGameWon(scoreSelf, scoreOpponent, target);
     const opponentWonGame = isGameWon(scoreOpponent, scoreSelf, target);
 
@@ -148,6 +174,8 @@ export function deriveState(match) {
         gameNumber,
         server: gameServer,
         isFinalGame,
+        finalGameFormat: isFinalGame ? finalGameFormat : null,
+        rotatesBetweenPairs,
         points: currentGamePoints,
         scoreSelf,
         scoreOpponent,
@@ -171,24 +199,28 @@ export function deriveState(match) {
   }
 
   const isFinished = matchWinner !== null;
+  const { rotatesBetweenPairs: currentRotates, target: currentTarget } = finalGameRule(isFinalGame, finalGameFormat);
   const currentGame = isFinished
     ? null
     : {
         gameNumber,
         server: gameServer,
         isFinalGame,
+        finalGameFormat: isFinalGame ? finalGameFormat : null,
+        rotatesBetweenPairs: currentRotates,
         points: currentGamePoints,
         scoreSelf,
         scoreOpponent,
       };
 
   // 次に記録されるポイント（0始まり）の時点で、実際にサーブするチーム/選手を求める。
-  // ファイナルゲームでは2ポイントごとに回転するため、ゲーム開始時のサーブ側とは限らない。
+  // 7ポイント制ファイナルゲームでは2ポイントごとに回転するため、ゲーム開始時のサーブ側
+  // とは限らない。
   const pointIndexInGame = currentGamePoints.length;
-  const currentServer = isFinished ? null : serverTeamForPoint(gameServer, isFinalGame, pointIndexInGame);
+  const currentServer = isFinished ? null : serverTeamForPoint(gameServer, currentRotates, pointIndexInGame);
   const currentServerPosition = isFinished
     ? null
-    : activeServePosition(match, currentServer, gameServer, isFinalGame, pointIndexInGame);
+    : activeServePosition(match, currentServer, gameServer, currentRotates, pointIndexInGame);
   const currentServerTeam = currentServer === 'self' ? match.self : currentServer === 'opponent' ? match.opponent : null;
 
   return {
@@ -202,6 +234,6 @@ export function deriveState(match) {
     currentServer,
     currentServerPosition,
     currentServerPlayerName: (isFinished || !currentServerPosition) ? null : currentServerTeam[currentServerPosition],
-    pointsToWinCurrentGame: isFinished ? null : (isFinalGame ? POINTS_TO_WIN_FINAL_GAME : POINTS_TO_WIN_GAME),
+    pointsToWinCurrentGame: isFinished ? null : currentTarget,
   };
 }

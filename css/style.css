@@ -141,6 +141,10 @@ table.sheet-table th { background: #eef1ec; }
 .stat-box .label { font-size: 0.78rem; color: var(--gray); }
 .stat-box .value { font-size: 1.3rem; font-weight: bold; color: var(--green-dark); }
 .export-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.warning-box {
+  background: #fff3e0; border: 1px solid #f0b45c; border-radius: 8px;
+  padding: 10px 12px; font-size: 0.85rem; color: #7a4a00; margin-bottom: 12px;
+}
 
 @media print {
   header.appbar, .no-print { display: none !important; }

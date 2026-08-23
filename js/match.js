@@ -1,4 +1,4 @@
-import { deriveState, reasonOptions, other, activeServePosition, AUTO_POSITION_SHOT_TYPES, DEFAULT_MATCH_FORMAT } from './rules.js';
+import { deriveState, reasonOptions, other, activeServePosition, AUTO_POSITION_SHOT_TYPES, DEFAULT_MATCH_FORMAT, FINAL_GAME_POINT_OPTIONS } from './rules.js';
 import { saveMatch } from './storage.js';
 import { shell, escapeHtml } from './ui.js';
 
@@ -44,7 +44,7 @@ export function renderMatchScreen(app, initialMatch) {
     addPoint({
       winner: other(server),
       reason: { shotType: 'double_fault', outcome: 'error', agentTeam: server },
-      actingPlayerKey: activeServePosition(match, server, state.currentGame.server, state.currentGame.isFinalGame, state.currentGame.points.length),
+      actingPlayerKey: activeServePosition(match, server, state.currentGame.server, state.currentGame.rotatesBetweenPairs, state.currentGame.points.length),
       serveType: '2nd',
       server,
     });
@@ -61,7 +61,7 @@ export function renderMatchScreen(app, initialMatch) {
       addPoint({
         winner: pendingWinner,
         reason,
-        actingPlayerKey: activeServePosition(match, reason.agentTeam, state.currentGame.server, state.currentGame.isFinalGame, state.currentGame.points.length),
+        actingPlayerKey: activeServePosition(match, reason.agentTeam, state.currentGame.server, state.currentGame.rotatesBetweenPairs, state.currentGame.points.length),
         serveType: servePhase,
         server: state.currentServer,
       });
@@ -88,6 +88,12 @@ export function renderMatchScreen(app, initialMatch) {
     render();
   }
 
+  function handleFinalGameFormat(points) {
+    match.finalGameFormat = points;
+    persist();
+    render();
+  }
+
   function handleUndo() {
     if (match.pointLog.length === 0) return;
     match.pointLog.pop();
@@ -100,7 +106,7 @@ export function renderMatchScreen(app, initialMatch) {
 
   function teamLabel(side) {
     const team = side === 'self' ? match.self : match.opponent;
-    return `${team.front}・${team.back}`;
+    return `${team.back}・${team.front}`;
   }
 
   function renderServePositionChoice(state) {
@@ -119,7 +125,7 @@ export function renderMatchScreen(app, initialMatch) {
           </div>
           <div class="serve-status">
             ${escapeHtml(teamName)}（${escapeHtml(teamLabel(side))}）が最初にサーブします。<br>
-            この試合を通してサーブ（およびレシーブ）を担当する選手を選んでください。
+            まずサーブ（およびレシーブ）を最初に担当する選手を選んでください。サーブ権はゲーム中2ポイントごとにペア内のもう一方の選手と交代します。
           </div>
           <div class="win-buttons">
             <button id="btn-serve-pos-back">${escapeHtml(team.back)}（後衛）</button>
@@ -131,6 +137,37 @@ export function renderMatchScreen(app, initialMatch) {
 
     document.getElementById('btn-serve-pos-back')?.addEventListener('click', () => handleServePosition(side, 'back'));
     document.getElementById('btn-serve-pos-front')?.addEventListener('click', () => handleServePosition(side, 'front'));
+  }
+
+  function renderFinalGameFormatChoice(state) {
+    shell(app, {
+      title: `${escapeHtml(match.self.front)}組 vs ${escapeHtml(match.opponent.front)}組`,
+      backHref: '#/',
+      actionsHtml: `<button data-nav="#/sheet/${match.id}">シート</button>`,
+      bodyHtml: `
+        <div class="card">
+          <div class="game-status">
+            第${state.currentGame.gameNumber}ゲーム（ファイナルゲーム・ゲームカウント ${state.gameCountSelf} - ${state.gameCountOpponent}）
+          </div>
+          <div class="serve-status">
+            🏆 ファイナルゲームです。形式を選んでください。
+          </div>
+          <div class="win-buttons">
+            ${FINAL_GAME_POINT_OPTIONS.map((points) => `
+              <button data-final-points="${points}">
+                ${points}ポイント先取${points === 7
+                  ? '（6-6以降は2点差・サーブは2ポイントごとに両ペア間で交代）'
+                  : '（3-3以降は2点差・通常ゲームと同じく片方のペアのみサーブ）'}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `,
+    });
+
+    app.querySelectorAll('[data-final-points]').forEach((btn) => {
+      btn.addEventListener('click', () => handleFinalGameFormat(Number(btn.getAttribute('data-final-points'))));
+    });
   }
 
   function render() {
@@ -146,13 +183,21 @@ export function renderMatchScreen(app, initialMatch) {
       return;
     }
 
+    if (state.currentGame.isFinalGame && !match.finalGameFormat) {
+      renderFinalGameFormatChoice(state);
+      return;
+    }
+
     if (!state.currentServerPosition) {
       renderServePositionChoice(state);
       return;
     }
 
+    const finalGameRule = match.finalGameFormat === 4
+      ? '4ポイント先取・3-3以降は2点差'
+      : '7ポイント先取・6-6以降は2点差';
     const banner = state.currentGame.isFinalGame && state.currentGame.points.length === 0
-      ? `<div class="banner">🏆 ゲームカウント${state.gameCountSelf}-${state.gameCountOpponent}！ ファイナルゲーム（7ポイント先取・6-6以降は2点差）です</div>`
+      ? `<div class="banner">🏆 ゲームカウント${state.gameCountSelf}-${state.gameCountOpponent}！ ファイナルゲーム（${finalGameRule}）です</div>`
       : '';
 
     let actionHtml;

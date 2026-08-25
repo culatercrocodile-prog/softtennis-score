@@ -104,7 +104,19 @@ legend { padding: 0 6px; font-weight: bold; color: var(--green-dark); }
 .scoreboard .side.serving .name::before { content: "● "; color: var(--green); }
 .scoreboard .sep { font-size: 1.6rem; color: var(--gray); }
 
-.game-status { text-align: center; font-size: 0.9rem; color: var(--gray); margin-bottom: 8px; }
+.game-status { text-align: center; font-size: 0.9rem; color: var(--gray); margin-bottom: 4px; }
+.game-count { text-align: center; margin-bottom: 10px; font-size: 0.95rem; color: var(--gray); }
+.game-count .game-count-value {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 14px;
+  border-radius: 999px;
+  background: var(--green);
+  color: #fff;
+  font-size: 1.3rem;
+  font-weight: bold;
+  letter-spacing: 0.02em;
+}
 .serve-status { text-align: center; font-size: 1rem; margin-bottom: 12px; }
 
 .button-grid {

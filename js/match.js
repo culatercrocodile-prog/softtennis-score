@@ -109,6 +109,15 @@ export function renderMatchScreen(app, initialMatch) {
     return `${team.back}・${team.front}`;
   }
 
+  function gameCountBadgeHtml(state) {
+    return `
+      <div class="game-count">
+        ゲームカウント
+        <span class="game-count-value">${state.gameCountSelf} - ${state.gameCountOpponent}</span>
+      </div>
+    `;
+  }
+
   function renderServePositionChoice(state) {
     const side = state.currentServer;
     const team = side === 'self' ? match.self : match.opponent;
@@ -121,8 +130,9 @@ export function renderMatchScreen(app, initialMatch) {
       bodyHtml: `
         <div class="card">
           <div class="game-status">
-            第${state.currentGame.gameNumber}ゲーム（${match.matchFormat ?? DEFAULT_MATCH_FORMAT}ゲームマッチ・ゲームカウント ${state.gameCountSelf} - ${state.gameCountOpponent}）
+            第${state.currentGame.gameNumber}ゲーム（${match.matchFormat ?? DEFAULT_MATCH_FORMAT}ゲームマッチ）
           </div>
+          ${gameCountBadgeHtml(state)}
           <div class="serve-status">
             ${escapeHtml(teamName)}（${escapeHtml(teamLabel(side))}）が最初にサーブします。<br>
             まずサーブ（およびレシーブ）を最初に担当する選手を選んでください。サーブ権はゲーム中2ポイントごとにペア内のもう一方の選手と交代します。
@@ -147,8 +157,9 @@ export function renderMatchScreen(app, initialMatch) {
       bodyHtml: `
         <div class="card">
           <div class="game-status">
-            第${state.currentGame.gameNumber}ゲーム（ファイナルゲーム・ゲームカウント ${state.gameCountSelf} - ${state.gameCountOpponent}）
+            第${state.currentGame.gameNumber}ゲーム（ファイナルゲーム）
           </div>
+          ${gameCountBadgeHtml(state)}
           <div class="serve-status">
             🏆 ファイナルゲームです。形式を選んでください。
           </div>
@@ -245,8 +256,9 @@ export function renderMatchScreen(app, initialMatch) {
       bodyHtml: `
         <div class="card">
           <div class="game-status">
-            第${state.currentGame.gameNumber}ゲーム（${match.matchFormat ?? DEFAULT_MATCH_FORMAT}ゲームマッチ・ゲームカウント ${state.gameCountSelf} - ${state.gameCountOpponent}）
+            第${state.currentGame.gameNumber}ゲーム（${match.matchFormat ?? DEFAULT_MATCH_FORMAT}ゲームマッチ）
           </div>
+          ${gameCountBadgeHtml(state)}
           ${banner}
           <div class="scoreboard">
             <div class="side ${state.currentServer === 'self' ? 'serving' : ''}">

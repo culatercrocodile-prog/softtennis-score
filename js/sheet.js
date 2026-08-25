@@ -246,21 +246,23 @@ export function renderSheetScreen(app, match) {
     actionsHtml: match.status !== 'finished' ? `<button data-nav="#/match/${match.id}">記録へ戻る</button>` : '',
     bodyHtml: `
       <div id="sheet-content">
-        <div class="card">
-          <h2>${escapeHtml(teamName(match, 'self'))}（自ペア） vs ${escapeHtml(teamName(match, 'opponent'))}（相手ペア）</h2>
-          <p>${dateStr}　${match.matchFormat ?? DEFAULT_MATCH_FORMAT}ゲームマッチ　${resultLine}</p>
+        <div id="sheet-overview">
+          <div class="card">
+            <h2>${escapeHtml(teamName(match, 'self'))}（自ペア） vs ${escapeHtml(teamName(match, 'opponent'))}（相手ペア）</h2>
+            <p>${dateStr}　${match.matchFormat ?? DEFAULT_MATCH_FORMAT}ゲームマッチ　${resultLine}</p>
+          </div>
+
+          <div class="card">
+            <h3>ゲーム経過</h3>
+            <table class="sheet-table">
+              <thead><tr><th>ゲーム</th><th>サーブ</th><th>スコア（自-相手）</th><th>勝者</th></tr></thead>
+              <tbody>${gameRows}</tbody>
+            </table>
+          </div>
         </div>
 
-        <div class="card">
-          <h3>ゲーム経過</h3>
-          <table class="sheet-table">
-            <thead><tr><th>ゲーム</th><th>サーブ</th><th>スコア（自-相手）</th><th>勝者</th></tr></thead>
-            <tbody>${gameRows}</tbody>
-          </table>
-        </div>
-
-        ${teamStatsHtml(match, 'self', selfStats)}
-        ${teamStatsHtml(match, 'opponent', opponentStats)}
+        <div id="sheet-self-section">${teamStatsHtml(match, 'self', selfStats)}</div>
+        <div id="sheet-opponent-section">${teamStatsHtml(match, 'opponent', opponentStats)}</div>
       </div>
 
       <div class="card no-print">
@@ -298,29 +300,35 @@ export function renderSheetScreen(app, match) {
   });
 }
 
-// スコアシート画面のDOMをそのまま画像化し、A4サイズのPDFファイルとしてダウンロードする。
+// スコアシート画面のDOMをセクション（概要／自ペア成績／相手ペア成績）ごとに画像化し、
+// それぞれを1ページに収めてA4サイズのPDFファイルとしてダウンロードする。
 // 日本語フォントをPDF側に埋め込む必要がないよう、html2canvasでラスタライズしてから
 // jsPDFに画像として貼り付ける方式を取っている。
 async function downloadSheetPdf(match) {
-  const target = document.getElementById('sheet-content');
-  const canvas = await window.html2canvas(target, { scale: 2, backgroundColor: '#ffffff' });
+  const sectionIds = ['sheet-overview', 'sheet-self-section', 'sheet-opponent-section'];
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF('p', 'mm', 'a4');
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const imgWidth = pageWidth;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-  const imgData = canvas.toDataURL('image/png');
 
-  let heightLeft = imgHeight;
-  let position = 0;
-  pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-  heightLeft -= pageHeight;
-  while (heightLeft > 0) {
-    position -= pageHeight;
-    pdf.addPage();
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
+  for (let i = 0; i < sectionIds.length; i++) {
+    const target = document.getElementById(sectionIds[i]);
+    // スマホの狭い画面幅のまま撮ると縦に長くなり過ぎて1ページに収めた際に文字が小さくなり
+    // すぎるため、PC相当の幅（mainのmax-width: 720pxが効く幅）で仮想的にレンダリングする。
+    const canvas = await window.html2canvas(target, { scale: 2, backgroundColor: '#ffffff', windowWidth: 800 });
+    const imgData = canvas.toDataURL('image/png');
+
+    // 1ページに収まるよう、幅基準で収まらない場合は高さ基準に切り替えて縮小する。
+    let imgWidth = pageWidth;
+    let imgHeight = (canvas.height * imgWidth) / canvas.width;
+    if (imgHeight > pageHeight) {
+      imgHeight = pageHeight;
+      imgWidth = (canvas.width * imgHeight) / canvas.height;
+    }
+    const x = (pageWidth - imgWidth) / 2;
+
+    if (i > 0) pdf.addPage();
+    pdf.addImage(imgData, 'PNG', x, 0, imgWidth, imgHeight);
   }
   pdf.save(`softtennis_${match.id}.pdf`);
 }

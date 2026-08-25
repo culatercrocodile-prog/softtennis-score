@@ -151,5 +151,9 @@ table.sheet-table th { background: #eef1ec; }
   body { background: #fff; }
   main { max-width: 100%; padding: 0; }
   .card { border: none; padding: 0; margin-bottom: 10px; page-break-inside: avoid; }
+  #sheet-self-section, #sheet-opponent-section {
+    page-break-before: always;
+    break-before: page;
+  }
   @page { size: A4; margin: 12mm; }
 }

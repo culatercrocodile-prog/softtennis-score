@@ -127,8 +127,8 @@ legend { padding: 0 6px; font-weight: bold; color: var(--green-dark); }
 
 .win-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
 .win-buttons button { min-height: 64px; font-size: 1.05rem; font-weight: bold; }
-.win-buttons .self-btn { background: #eaf5ee; border-color: var(--green); color: var(--green-dark); }
-.win-buttons .opponent-btn { background: #fbeceb; border-color: var(--red); color: #7a1913; }
+.self-btn { background: #eaf5ee; border-color: var(--green); color: var(--green-dark); }
+.opponent-btn { background: #fbeceb; border-color: var(--red); color: #7a1913; }
 
 .fault-btn { background: #fff6e0; border-color: #caa227; color: #7a5c05; }
 

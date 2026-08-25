@@ -230,7 +230,7 @@ export function renderMatchScreen(app, initialMatch) {
       actionHtml = `
         <div class="serve-status">${label} — 決まり方を選択してください</div>
         <div class="category-grid">
-          ${options.map((o, i) => `<button data-reason="${i}">${escapeHtml(o.label)}</button>`).join('')}
+          ${options.map((o, i) => `<button class="${o.agentTeam === 'self' ? 'self-btn' : 'opponent-btn'}" data-reason="${i}">${escapeHtml(o.label)}</button>`).join('')}
         </div>
         <button class="btn-block no-print" id="btn-cancel-reason">← 選び直す</button>
       `;

@@ -28,6 +28,19 @@ function teamName(match, team) {
   return `${t.back}・${t.front}`;
 }
 
+// ファイル名に使えない文字（Windows/macOS共通でNGとなるもの）を置換する。
+function sanitizeFileNamePart(s) {
+  return s.replace(/[\\/:*?"<>|]/g, '_');
+}
+
+// 「日付_対戦相手ペア名」を含むファイル名のベース部分を作る。試合を見分けやすくするため。
+function matchFileBaseName(match) {
+  const d = new Date(match.createdAt);
+  const dateStr = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  const opponent = sanitizeFileNamePart(teamName(match, 'opponent'));
+  return `softtennis_${dateStr}_vs_${opponent}`;
+}
+
 function playerName(match, team, positionKey) {
   const t = team === 'self' ? match.self : match.opponent;
   if (positionKey === 'front') return t.front;
@@ -296,7 +309,7 @@ export function renderSheetScreen(app, match) {
     }
   });
   document.getElementById('btn-csv')?.addEventListener('click', () => {
-    downloadBlob(`softtennis_${match.id}.csv`, `﻿${toCsv(match, games)}`, 'text/csv;charset=utf-8');
+    downloadBlob(`${matchFileBaseName(match)}.csv`, `﻿${toCsv(match, games)}`, 'text/csv;charset=utf-8');
   });
 }
 
@@ -330,5 +343,5 @@ async function downloadSheetPdf(match) {
     if (i > 0) pdf.addPage();
     pdf.addImage(imgData, 'PNG', x, 0, imgWidth, imgHeight);
   }
-  pdf.save(`softtennis_${match.id}.pdf`);
+  pdf.save(`${matchFileBaseName(match)}.pdf`);
 }

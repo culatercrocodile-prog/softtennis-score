@@ -30,16 +30,16 @@ function teamName(match, team) {
 
 // ファイル名に使えない文字（Windows/macOS共通でNGとなるもの）を置換する。
 function sanitizeFileNamePart(s) {
-  return s.replace(/[\\/:*?"<>|]/g, '_');
+  return s.replace(/[\\/:*?"<>|]/g, '-');
 }
 
-// 「日付_自ペア名_vs_対戦相手ペア名」を含むファイル名のベース部分を作る。試合を見分けやすくするため。
+// 「日付 自ペア名 vs 対戦相手ペア名」を含むファイル名のベース部分を作る。試合を見分けやすくするため。
 function matchFileBaseName(match) {
   const d = new Date(match.createdAt);
   const dateStr = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
   const self = sanitizeFileNamePart(teamName(match, 'self'));
   const opponent = sanitizeFileNamePart(teamName(match, 'opponent'));
-  return `softtennis_${dateStr}_${self}_vs_${opponent}`;
+  return `${dateStr} ${self} vs ${opponent}`;
 }
 
 function playerName(match, team, positionKey) {

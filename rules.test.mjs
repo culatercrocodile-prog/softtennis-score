@@ -207,13 +207,22 @@ test('ファイナルゲームでは2ポイントごとに「自ペア→相手�
   });
 });
 
-test('通常ゲームでは2ポイントごとに同じペア内でサーブ選手が交代する（レシーブ側は固定）', () => {
+test('通常ゲームでは2ポイントごとに同じペア内でサーブ選手が交代する（レシーブ選手は本数の偶数/奇数で交代する）', () => {
   const match = baseMatch({});
-  const expectedPositions = ['back', 'back', 'front', 'front', 'back', 'back', 'front', 'front'];
-  expectedPositions.forEach((expected, i) => {
+  const expectedServePositions = ['back', 'back', 'front', 'front', 'back', 'back', 'front', 'front'];
+  // レシーブ側は0-0（0本目=偶数）からの1本目は後衛、次（奇数本目）は前衛…と、
+  // サーブ側の交代とは別に、そのゲーム内の本数の偶数/奇数だけで決まる。
+  const expectedReceivePositions = ['back', 'front', 'back', 'front', 'back', 'front', 'back', 'front'];
+  expectedServePositions.forEach((expected, i) => {
     assert.equal(activeServePosition(match, 'self', 'self', false, i), expected, `point index ${i} のサーブ選手`);
-    assert.equal(activeServePosition(match, 'opponent', 'self', false, i), 'back', `point index ${i} のレシーブ選手は固定`);
+    assert.equal(activeServePosition(match, 'opponent', 'self', false, i), expectedReceivePositions[i], `point index ${i} のレシーブ選手`);
   });
+});
+
+test('レシーブ側の選手判定はレシーブ側チームのserverPosition未設定でも成立する', () => {
+  const match = baseMatch({ opponent: { front: '相前衛', back: '相後衛' } });
+  assert.equal(activeServePosition(match, 'opponent', 'self', false, 0), 'back');
+  assert.equal(activeServePosition(match, 'opponent', 'self', false, 1), 'front');
 });
 
 test('通常ゲームのサーブ交代は実際の試合進行（deriveState）でも反映される', () => {

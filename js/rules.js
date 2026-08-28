@@ -41,23 +41,29 @@ export function serverTeamForPoint(gameServer, rotatesBetweenPairs, pointIndexIn
 }
 
 // side ('self'|'opponent') のペアが、サーブ（またはレシーブ）を行う選手のポジション
-// ('front'|'back') を返す。まだ選手が選択されていない場合は null を返す（記録画面で
-// その都度選んでもらう必要がある）。
-// rotatesBetweenPairs=false（通常ゲーム・4ポイント制ファイナル）: サーブ側ペアのみ、
-// 2ポイントごとに担当選手が交代する（レシーブ側は指定済みの選手で固定）。
-// rotatesBetweenPairs=true（7ポイント制ファイナル）: 2ポイントごとに両ペア間でサーブ権
-// 自体が回転し、各ペア内でも自分たちの番が回ってくるたびに担当選手が交代する。
+// ('front'|'back') を返す。サーブ側でまだ選手が選択されていない場合は null を返す
+// （記録画面でその都度選んでもらう必要がある）。
+// サーブ側: rotatesBetweenPairs=false（通常ゲーム・4ポイント制ファイナル）ではサーブ側
+// ペアのみ2ポイントごとに担当選手が交代する。rotatesBetweenPairs=true（7ポイント制
+// ファイナル）では2ポイントごとに両ペア間でサーブ権自体が回転し、各ペア内でも自分たち
+// の番が回ってくるたびに担当選手が交代する。
+// レシーブ側: そのゲーム内で何本目のサーブ（0始まり）かの偶数/奇数だけで決まり
+// （0-0からの1本目=0本目=偶数は後衛、次の奇数本目は前衛…）、レシーブ側チームが
+// どちらの選手をサーブ順1番目に選んだか（serverPosition）とは無関係。
 export function activeServePosition(match, side, gameServer, rotatesBetweenPairs, pointIndexInGame) {
   const team = side === 'self' ? match.self : match.opponent;
+  const actualServer = serverTeamForPoint(gameServer, rotatesBetweenPairs, pointIndexInGame);
+
+  if (side !== actualServer) {
+    return pointIndexInGame % 2 === 0 ? 'back' : 'front';
+  }
+
   if (!team.serverPosition) return null;
+  const block = Math.floor(pointIndexInGame / 2);
   if (!rotatesBetweenPairs) {
-    if (side !== gameServer) return team.serverPosition;
-    const block = Math.floor(pointIndexInGame / 2);
     return block % 2 === 0 ? team.serverPosition : otherPosition(team.serverPosition);
   }
-  const offset = side === gameServer ? 0 : 1;
-  const block = Math.floor(pointIndexInGame / 2);
-  const localTurn = Math.max(0, Math.floor((block - offset) / 2));
+  const localTurn = Math.floor(block / 2);
   return localTurn % 2 === 0 ? team.serverPosition : otherPosition(team.serverPosition);
 }
 

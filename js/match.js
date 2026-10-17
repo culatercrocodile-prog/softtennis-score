@@ -7,6 +7,20 @@ export function renderMatchScreen(app, initialMatch) {
   let pendingWinner = null; // null | 'self' | 'opponent'
   let pendingReason = null; // null | { shotType, outcome, agentTeam, label }
   let servePhase = '1st'; // '1st' | '2nd'
+  let editingNames = false;
+
+  const headerActionsHtml = `
+    <button data-edit-names>選手名</button>
+    <button data-nav="#/sheet/${match.id}">シート</button>
+  `;
+
+  function matchShell(opts) {
+    shell(app, opts);
+    app.querySelector('[data-edit-names]')?.addEventListener('click', () => {
+      editingNames = true;
+      render();
+    });
+  }
 
   function persist() {
     saveMatch(match);
@@ -123,10 +137,10 @@ export function renderMatchScreen(app, initialMatch) {
     const team = side === 'self' ? match.self : match.opponent;
     const teamName = side === 'self' ? '自ペア' : '相手ペア';
 
-    shell(app, {
+    matchShell({
       title: `${escapeHtml(match.self.front)}組 vs ${escapeHtml(match.opponent.front)}組`,
       backHref: '#/',
-      actionsHtml: `<button data-nav="#/sheet/${match.id}">シート</button>`,
+      actionsHtml: headerActionsHtml,
       bodyHtml: `
         <div class="card">
           <div class="game-status">
@@ -150,10 +164,10 @@ export function renderMatchScreen(app, initialMatch) {
   }
 
   function renderFinalGameFormatChoice(state) {
-    shell(app, {
+    matchShell({
       title: `${escapeHtml(match.self.front)}組 vs ${escapeHtml(match.opponent.front)}組`,
       backHref: '#/',
-      actionsHtml: `<button data-nav="#/sheet/${match.id}">シート</button>`,
+      actionsHtml: headerActionsHtml,
       bodyHtml: `
         <div class="card">
           <div class="game-status">
@@ -181,6 +195,48 @@ export function renderMatchScreen(app, initialMatch) {
     });
   }
 
+  function renderNameEditor() {
+    const field = (label, name, value) =>
+      `<div class="field"><label>${label}</label><input type="text" name="${name}" value="${escapeHtml(value)}" required></div>`;
+
+    shell(app, {
+      title: '選手名の変更',
+      bodyHtml: `
+        <form class="card" id="names-form">
+          <fieldset>
+            <legend>自ペア</legend>
+            ${field('後衛の選手名', 'selfBack', match.self.back)}
+            ${field('前衛の選手名', 'selfFront', match.self.front)}
+          </fieldset>
+          <fieldset>
+            <legend>相手ペア</legend>
+            ${field('後衛の選手名', 'oppBack', match.opponent.back)}
+            ${field('前衛の選手名', 'oppFront', match.opponent.front)}
+          </fieldset>
+          <p style="font-size:0.85rem;color:var(--gray)">※これまでの記録の選手名もすべて新しい名前に置き換わります。</p>
+          <button type="submit" class="btn-primary btn-block">保存</button>
+          <button type="button" class="btn-block" id="btn-cancel-names">キャンセル</button>
+        </form>
+      `,
+    });
+
+    document.getElementById('names-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      match.self.back = fd.get('selfBack').trim();
+      match.self.front = fd.get('selfFront').trim();
+      match.opponent.back = fd.get('oppBack').trim();
+      match.opponent.front = fd.get('oppFront').trim();
+      persist();
+      editingNames = false;
+      render();
+    });
+    document.getElementById('btn-cancel-names').addEventListener('click', () => {
+      editingNames = false;
+      render();
+    });
+  }
+
   function render() {
     const state = deriveState(match);
 
@@ -191,6 +247,11 @@ export function renderMatchScreen(app, initialMatch) {
         persist();
       }
       location.hash = `#/sheet/${match.id}`;
+      return;
+    }
+
+    if (editingNames) {
+      renderNameEditor();
       return;
     }
 
@@ -249,10 +310,10 @@ export function renderMatchScreen(app, initialMatch) {
       `;
     }
 
-    shell(app, {
+    matchShell({
       title: `${escapeHtml(match.self.front)}組 vs ${escapeHtml(match.opponent.front)}組`,
       backHref: '#/',
-      actionsHtml: `<button data-nav="#/sheet/${match.id}">シート</button>`,
+      actionsHtml: headerActionsHtml,
       bodyHtml: `
         <div class="card">
           <div class="game-status">

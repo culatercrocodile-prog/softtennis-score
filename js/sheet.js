@@ -235,6 +235,8 @@ function teamStatsHtml(match, team, stats) {
   `;
 }
 
+const APP_TITLE = document.title;
+
 export function renderSheetScreen(app, match) {
   const state = deriveState(match);
   const games = flattenGames(state);
@@ -296,19 +298,12 @@ export function renderSheetScreen(app, match) {
     `,
   });
 
-  // 印刷ダイアログ（PDF保存・共有）の既定ファイル名はdocument.titleから決まるため、一時的に差し替える。
-  document.getElementById('btn-print')?.addEventListener('click', () => {
-    const originalTitle = document.title;
-    const restore = () => {
-      document.title = originalTitle;
-      window.removeEventListener('afterprint', restore);
-      window.removeEventListener('hashchange', restore);
-    };
-    document.title = matchFileBaseName(match);
-    window.addEventListener('afterprint', restore);
-    window.addEventListener('hashchange', restore);
-    window.print();
-  });
+  // 印刷ダイアログ（PDF保存・共有）の既定ファイル名はdocument.titleから決まる。スマホでは
+  // afterprintが早く発火したり、共有時に改めてタイトルを読むことがあるため、
+  // シート画面を表示している間はずっと試合名のタイトルにしておく。
+  document.title = matchFileBaseName(match);
+  window.addEventListener('hashchange', () => { document.title = APP_TITLE; }, { once: true });
+  document.getElementById('btn-print')?.addEventListener('click', () => window.print());
   document.getElementById('btn-pdf')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-pdf');
     const originalLabel = btn.textContent;

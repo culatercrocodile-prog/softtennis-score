@@ -296,7 +296,19 @@ export function renderSheetScreen(app, match) {
     `,
   });
 
-  document.getElementById('btn-print')?.addEventListener('click', () => window.print());
+  // 印刷ダイアログ（PDF保存・共有）の既定ファイル名はdocument.titleから決まるため、一時的に差し替える。
+  document.getElementById('btn-print')?.addEventListener('click', () => {
+    const originalTitle = document.title;
+    const restore = () => {
+      document.title = originalTitle;
+      window.removeEventListener('afterprint', restore);
+      window.removeEventListener('hashchange', restore);
+    };
+    document.title = matchFileBaseName(match);
+    window.addEventListener('afterprint', restore);
+    window.addEventListener('hashchange', restore);
+    window.print();
+  });
   document.getElementById('btn-pdf')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-pdf');
     const originalLabel = btn.textContent;

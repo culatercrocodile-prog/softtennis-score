@@ -290,7 +290,8 @@ export function renderSheetScreen(app, match) {
           </p>
         ` : ''}
         <div class="export-buttons">
-          <button class="btn-primary" id="btn-print">印刷用PDF（印刷ダイアログ）</button>
+          <button class="btn-primary" id="btn-share" hidden disabled>PDFを共有（LINEなど）</button>
+          <button id="btn-print">印刷用PDF（印刷ダイアログ）</button>
           <button id="btn-pdf">PDFダウンロード</button>
           <button id="btn-csv">CSVダウンロード</button>
         </div>
@@ -304,6 +305,31 @@ export function renderSheetScreen(app, match) {
   document.title = matchFileBaseName(match);
   window.addEventListener('hashchange', () => { document.title = APP_TITLE; }, { once: true });
   document.getElementById('btn-print')?.addEventListener('click', () => window.print());
+
+  const shareBtn = document.getElementById('btn-share');
+  const canShareFiles = typeof navigator.canShare === 'function' && typeof navigator.share === 'function'
+    && navigator.canShare({ files: [new File([''], 'a.pdf', { type: 'application/pdf' })] });
+  if (shareBtn && canShareFiles) {
+    const shareLabel = shareBtn.textContent;
+    shareBtn.hidden = false;
+    shareBtn.textContent = 'PDFを共有（準備中…）';
+    let readyFile = null;
+    buildSheetPdfFile(match).then((file) => {
+      readyFile = file;
+      shareBtn.disabled = false;
+      shareBtn.textContent = shareLabel;
+    }).catch(() => {
+      shareBtn.textContent = 'PDFを共有（準備に失敗）';
+    });
+    shareBtn.addEventListener('click', async () => {
+      if (!readyFile) return;
+      try {
+        await navigator.share({ files: [readyFile], title: matchFileBaseName(match) });
+      } catch (e) {
+        if (e.name !== 'AbortError') alert('共有できませんでした。「PDFダウンロード」をお使いください。');
+      }
+    });
+  }
   document.getElementById('btn-pdf')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-pdf');
     const originalLabel = btn.textContent;
@@ -325,7 +351,7 @@ export function renderSheetScreen(app, match) {
 // それぞれを1ページに収めてA4サイズのPDFファイルとしてダウンロードする。
 // 日本語フォントをPDF側に埋め込む必要がないよう、html2canvasでラスタライズしてから
 // jsPDFに画像として貼り付ける方式を取っている。
-async function downloadSheetPdf(match) {
+async function buildSheetPdf() {
   const sectionIds = ['sheet-overview', 'sheet-self-section', 'sheet-opponent-section'];
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF('p', 'mm', 'a4');
@@ -337,7 +363,7 @@ async function downloadSheetPdf(match) {
     // スマホの狭い画面幅のまま撮ると縦に長くなり過ぎて1ページに収めた際に文字が小さくなり
     // すぎるため、PC相当の幅（mainのmax-width: 720pxが効く幅）で仮想的にレンダリングする。
     const canvas = await window.html2canvas(target, { scale: 2, backgroundColor: '#ffffff', windowWidth: 800 });
-    const imgData = canvas.toDataURL('image/png');
+    const imgData = canvas.toDataURL('image/jpeg', 0.85);
 
     // 1ページに収まるよう、幅基準で収まらない場合は高さ基準に切り替えて縮小する。
     let imgWidth = pageWidth;
@@ -349,7 +375,19 @@ async function downloadSheetPdf(match) {
     const x = (pageWidth - imgWidth) / 2;
 
     if (i > 0) pdf.addPage();
-    pdf.addImage(imgData, 'PNG', x, 0, imgWidth, imgHeight);
+    pdf.addImage(imgData, 'JPEG', x, 0, imgWidth, imgHeight);
   }
+  return pdf;
+}
+
+async function downloadSheetPdf(match) {
+  const pdf = await buildSheetPdf();
   pdf.save(`${matchFileBaseName(match)}.pdf`);
+}
+
+// iOSのSafariは共有シートの呼び出しをタップ直後のごく短い間にしか許可しないため、
+// 重いPDF生成はあらかじめ済ませておき、タップ時はすぐnavigator.shareを呼べるようにする。
+async function buildSheetPdfFile(match) {
+  const pdf = await buildSheetPdf();
+  return new File([pdf.output('blob')], `${matchFileBaseName(match)}.pdf`, { type: 'application/pdf' });
 }

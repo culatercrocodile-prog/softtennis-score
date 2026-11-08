@@ -139,7 +139,10 @@ export function renderMatchScreen(app, initialMatch) {
   function rallyPickerHtml() {
     return `
       <div class="rally-picker">
-        <div class="rally-label">ラリー数（サーブも1球と数えた打球数）<span>${rallyCount ? `${rallyCount === 10 ? '10以上' : rallyCount}` : '未入力'}</span></div>
+        <div class="rally-head">
+          <div class="rally-title">ラリー数<small>サーブも1球と数えた打球数</small></div>
+          <div class="rally-value${rallyCount ? ' set' : ''}">${rallyCount ? (rallyCount === 10 ? '10以上' : rallyCount) : '未入力'}</div>
+        </div>
         <div class="rally-grid">
           ${RALLY_COUNT_OPTIONS.map((n) => `
             <button type="button" class="rally-chip${rallyCount === n ? ' selected' : ''}" data-rally="${n}">${n === 10 ? '10+' : n}</button>

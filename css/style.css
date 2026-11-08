@@ -170,9 +170,12 @@ table.sheet-table th { background: #eef1ec; }
   @page { size: A4; margin: 12mm; }
 }
 
-.rally-picker { margin-bottom: 12px; }
-.rally-label { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--gray); margin-bottom: 6px; }
-.rally-label span { font-weight: bold; color: var(--green-dark); }
+.rally-picker { margin-bottom: 14px; padding: 12px; background: #eef6f0; border: 2px solid var(--green); border-radius: 12px; }
+.rally-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.rally-title { font-size: 1.15rem; font-weight: bold; color: var(--green-dark); }
+.rally-title small { display: block; font-size: 0.72rem; font-weight: normal; color: var(--gray); }
+.rally-value { font-size: 1.1rem; font-weight: bold; color: var(--gray); background: #fff; border: 1px solid var(--border); border-radius: 999px; padding: 4px 16px; }
+.rally-value.set { background: var(--green); border-color: var(--green); color: #fff; font-size: 1.4rem; }
 .rally-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-.rally-chip { min-height: 44px; font-size: 1rem; font-weight: bold; padding: 0; }
-.rally-chip.selected { background: var(--green); border-color: var(--green); color: #fff; }
+.rally-chip { min-height: 52px; font-size: 1.2rem; font-weight: bold; padding: 0; background: #fff; border: 1px solid var(--green); color: var(--green-dark); }
+.rally-chip.selected { background: var(--green); border-color: var(--green-dark); color: #fff; }

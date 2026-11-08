@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveState, gamesToWinMatch, serverTeamForPoint, activeServePosition, reasonOptions } from './js/rules.js';
+import { deriveState, gamesToWinMatch, serverTeamForPoint, activeServePosition, reasonOptions, autoRallyCount } from './js/rules.js';
 
 function baseMatch(overrides = {}) {
   return {
@@ -302,4 +302,13 @@ test('ファイナルゲームの回転は実際の試合進行（deriveState）
   state = deriveState(match);
   assert.equal(state.currentServer, 'self');
   assert.equal(state.currentServerPosition, 'front');
+});
+
+test('サーブ直後に決まるポイントはラリー数が自動で確定し、それ以外は入力待ち', () => {
+  assert.equal(autoRallyCount('ace'), 1);
+  assert.equal(autoRallyCount('double_fault'), 1);
+  assert.equal(autoRallyCount('receive_ace'), 2);
+  assert.equal(autoRallyCount('receive'), 2);
+  assert.equal(autoRallyCount('volley'), null);
+  assert.equal(autoRallyCount('stroke'), null);
 });

@@ -75,6 +75,16 @@ export function activeServePosition(match, side, gameServer, rotatesBetweenPairs
 // ため、記録画面側で選手を選んでもらう。
 export const AUTO_POSITION_SHOT_TYPES = new Set(['ace', 'receive_ace', 'double_fault', 'receive']);
 
+// ラリー数＝サーブを1球目として数えた、そのポイント中の打球数。
+// サーブ直後に決まるポイントは打球数が確定するので入力不要にする。
+const AUTO_RALLY_COUNTS = { ace: 1, double_fault: 1, receive_ace: 2, receive: 2 };
+export function autoRallyCount(shotType) {
+  return AUTO_RALLY_COUNTS[shotType] ?? null;
+}
+
+export const RALLY_COUNT_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+export const SHORT_RALLY_MAX = 4;
+
 // 自ペア/相手ペアどちらの行為かをすべてのラベルで明示し、記録者が取り違えないようにする。
 const REASON_LABELS = {
   'ace|decide|self': '自ペアのサービスエース',

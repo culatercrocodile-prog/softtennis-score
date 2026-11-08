@@ -1,4 +1,4 @@
-import { deriveState, reasonOptions, other, activeServePosition, AUTO_POSITION_SHOT_TYPES, DEFAULT_MATCH_FORMAT, FINAL_GAME_POINT_OPTIONS } from './rules.js';
+import { deriveState, reasonOptions, other, activeServePosition, AUTO_POSITION_SHOT_TYPES, DEFAULT_MATCH_FORMAT, FINAL_GAME_POINT_OPTIONS, autoRallyCount, RALLY_COUNT_OPTIONS } from './rules.js';
 import { saveMatch } from './storage.js';
 import { shell, escapeHtml } from './ui.js';
 
@@ -8,6 +8,7 @@ export function renderMatchScreen(app, initialMatch) {
   let pendingReason = null; // null | { shotType, outcome, agentTeam, label }
   let servePhase = '1st'; // '1st' | '2nd'
   let editingNames = false;
+  let rallyCount = null; // null | 1..10（10は「10以上」）
 
   const headerActionsHtml = `
     <button data-edit-names>選手名</button>
@@ -30,9 +31,11 @@ export function renderMatchScreen(app, initialMatch) {
     pendingWinner = null;
     pendingReason = null;
     servePhase = '1st';
+    rallyCount = null;
   }
 
   function addPoint({ winner, reason, actingPlayerKey, serveType, server }) {
+    const rallies = autoRallyCount(reason.shotType) ?? rallyCount;
     match.pointLog.push({
       server,
       serveType,
@@ -41,6 +44,7 @@ export function renderMatchScreen(app, initialMatch) {
       shotType: reason.shotType,
       outcome: reason.outcome,
       actingPlayerKey, // 'front' | 'back'
+      ...(rallies ? { rallyCount: rallies } : {}),
       timestamp: new Date().toISOString(),
     });
     persist();
@@ -128,6 +132,19 @@ export function renderMatchScreen(app, initialMatch) {
       <div class="game-count">
         ゲームカウント
         <span class="game-count-value">${state.gameCountSelf} - ${state.gameCountOpponent}</span>
+      </div>
+    `;
+  }
+
+  function rallyPickerHtml() {
+    return `
+      <div class="rally-picker">
+        <div class="rally-label">ラリー数（サーブも1球と数えた打球数）<span>${rallyCount ? `${rallyCount === 10 ? '10以上' : rallyCount}` : '未入力'}</span></div>
+        <div class="rally-grid">
+          ${RALLY_COUNT_OPTIONS.map((n) => `
+            <button type="button" class="rally-chip${rallyCount === n ? ' selected' : ''}" data-rally="${n}">${n === 10 ? '10+' : n}</button>
+          `).join('')}
+        </div>
       </div>
     `;
   }
@@ -290,6 +307,7 @@ export function renderMatchScreen(app, initialMatch) {
       const label = pendingWinner === 'self' ? '自ペアの得点' : '相手ペアの得点';
       actionHtml = `
         <div class="serve-status">${label} — 決まり方を選択してください</div>
+        ${rallyPickerHtml()}
         <div class="category-grid">
           ${options.map((o, i) => `<button class="${o.agentTeam === 'self' ? 'self-btn' : 'opponent-btn'}" data-reason="${i}">${escapeHtml(o.label)}</button>`).join('')}
         </div>
@@ -302,6 +320,7 @@ export function renderMatchScreen(app, initialMatch) {
       const teamName = pendingReason.agentTeam === 'self' ? '自ペア' : '相手ペア';
       actionHtml = `
         <div class="serve-status">${escapeHtml(pendingReason.label)} — ${escapeHtml(teamName)}のどちらの選手が行いましたか？</div>
+        ${rallyPickerHtml()}
         <div class="win-buttons">
           <button id="btn-pos-front">${escapeHtml(team.front)}（前衛）</button>
           <button id="btn-pos-back">${escapeHtml(team.back)}（後衛）</button>
@@ -348,6 +367,13 @@ export function renderMatchScreen(app, initialMatch) {
     document.getElementById('btn-pos-front')?.addEventListener('click', () => handlePosition('front', state));
     document.getElementById('btn-pos-back')?.addEventListener('click', () => handlePosition('back', state));
     document.getElementById('btn-undo')?.addEventListener('click', handleUndo);
+    app.querySelectorAll('[data-rally]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const n = Number(btn.getAttribute('data-rally'));
+        rallyCount = rallyCount === n ? null : n;
+        render();
+      });
+    });
     app.querySelectorAll('[data-reason]').forEach((btn) => {
       btn.addEventListener('click', () => handleReason(render.currentOptions[Number(btn.getAttribute('data-reason'))], state));
     });

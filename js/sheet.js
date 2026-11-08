@@ -1,4 +1,4 @@
-import { deriveState, other, activeServePosition, DEFAULT_MATCH_FORMAT } from './rules.js';
+import { deriveState, other, activeServePosition, DEFAULT_MATCH_FORMAT, SHORT_RALLY_MAX } from './rules.js';
 import { shell, escapeHtml, isLineInAppBrowser } from './ui.js';
 
 const SHOT_TYPE_NAMES = {
@@ -77,6 +77,34 @@ function playerServiceStats(team, log, serverPosMap) {
   return stats;
 }
 
+function average(nums) {
+  return nums.length ? Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10 : null;
+}
+
+// ラリー数が記録されたポイントだけを対象に、平均と「SHORT_RALLY_MAX以内で決まったポイント」の内訳を求める。
+function computeRallyStats(log, team) {
+  const recorded = log.filter((p) => Number.isInteger(p.rallyCount));
+  const won = recorded.filter((p) => p.winner === team);
+  const lost = recorded.filter((p) => p.winner !== team);
+  const countBy = (pts) => Array.from({ length: SHORT_RALLY_MAX }, (_, i) => pts.filter((p) => p.rallyCount === i + 1).length);
+  const wonShort = countBy(won);
+  const lostShort = countBy(lost);
+  const sum = (a) => a.reduce((x, y) => x + y, 0);
+  return {
+    recorded: recorded.length,
+    unrecorded: log.length - recorded.length,
+    avgAll: average(recorded.map((p) => p.rallyCount)),
+    avgWon: average(won.map((p) => p.rallyCount)),
+    avgLost: average(lost.map((p) => p.rallyCount)),
+    wonN: won.length,
+    lostN: lost.length,
+    wonShort,
+    lostShort,
+    wonShortTotal: sum(wonShort),
+    lostShortTotal: sum(lostShort),
+  };
+}
+
 export function computeTeamStats(match, team, state) {
   const opp = other(team);
   const log = match.pointLog;
@@ -109,6 +137,7 @@ export function computeTeamStats(match, team, state) {
     total: { totalPoints, teamPoints, winRate: rate(teamPoints, totalPoints) },
     decidePoints,
     errorPoints,
+    rally: computeRallyStats(log, team),
   };
 }
 
@@ -147,7 +176,7 @@ function breakdownTable(points, match, team) {
 }
 
 function toCsv(match, games) {
-  const header = ['ゲーム', '第何ポイント', 'サーブ', 'サーブ種別', '得点/失点', '決まり方ペア', '決まり方', '決め/ミス', '実行選手', 'ポジション'];
+  const header = ['ゲーム', '第何ポイント', 'サーブ', 'サーブ種別', '得点/失点', '決まり方ペア', '決まり方', '決め/ミス', '実行選手', 'ポジション', 'ラリー数'];
   const rows = [header];
   games.forEach((g) => {
     g.points.forEach((p, i) => {
@@ -162,6 +191,7 @@ function toCsv(match, games) {
         p.outcome === 'decide' ? '決め' : 'ミス',
         playerName(match, p.agentTeam, p.actingPlayerKey),
         p.actingPlayerKey === 'front' ? '前衛' : p.actingPlayerKey === 'back' ? '後衛' : '',
+        p.rallyCount ?? '',
       ]);
     });
   });
@@ -198,6 +228,39 @@ function playerServiceStatsTable(match, team, players) {
     </table>`;
 }
 
+function fmtAvg(v) {
+  return v === null ? '-' : v.toFixed(1);
+}
+
+function rallyStatsHtml(label, r) {
+  const shortRow = (title, counts, total, den) => `
+    <tr>
+      <td>${title}</td>
+      ${counts.map((c) => `<td>${c}</td>`).join('')}
+      <td>${total}</td>
+      <td>${den ? `${rate(total, den)}%（${den}本中）` : '-'}</td>
+    </tr>`;
+  const headers = Array.from({ length: SHORT_RALLY_MAX }, (_, i) => `<th>${i + 1}</th>`).join('');
+  return `
+    <p><strong>ラリー数</strong>（サーブを1球と数えた打球数）</p>
+    ${r.recorded === 0 ? '<p>ラリー数の記録がありません。</p>' : `
+      <div class="stat-grid">
+        <div class="stat-box"><div class="label">平均ラリー数（全ポイント）</div><div class="value">${fmtAvg(r.avgAll)}</div></div>
+        <div class="stat-box"><div class="label">平均ラリー数（${label}の得点時／失点時）</div><div class="value">${fmtAvg(r.avgWon)} ／ ${fmtAvg(r.avgLost)}</div></div>
+      </div>
+      <p>${SHORT_RALLY_MAX}ラリー以内で決まったポイント</p>
+      <table class="sheet-table">
+        <thead><tr><th></th>${headers}<th>計</th><th>割合</th></tr></thead>
+        <tbody>
+          ${shortRow('得点', r.wonShort, r.wonShortTotal, r.wonN)}
+          ${shortRow('失点', r.lostShort, r.lostShortTotal, r.lostN)}
+        </tbody>
+      </table>
+      ${r.unrecorded > 0 ? `<p style="font-size:0.8rem;color:var(--gray)">※ラリー数が未入力の${r.unrecorded}ポイントは集計に含みません。割合は、得点（失点）のうちラリー数が入力されたポイントに対するものです。</p>` : ''}
+    `}
+  `;
+}
+
 function teamStatsHtml(match, team, stats) {
   const label = team === 'self' ? '自ペア' : '相手ペア';
   const oppLabel = team === 'self' ? '相手ペア' : '自ペア';
@@ -221,6 +284,7 @@ function teamStatsHtml(match, team, stats) {
         <div class="stat-box"><div class="label">総ポイント取得率</div><div class="value">${fmtRate(stats.total.winRate, stats.total.totalPoints)}</div></div>
         <div class="stat-box"><div class="label">総ポイント数</div><div class="value">${stats.total.teamPoints} / ${stats.total.totalPoints}</div></div>
       </div>
+      ${rallyStatsHtml(label, stats.rally)}
       <p>${label}が決めて得点（前衛・後衛別）</p>
       <table class="sheet-table">
         <thead><tr><th>決まり方</th><th>前衛</th><th>後衛</th><th>件数</th><th>割合</th></tr></thead>

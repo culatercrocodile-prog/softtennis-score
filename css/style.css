@@ -169,3 +169,10 @@ table.sheet-table th { background: #eef1ec; }
   }
   @page { size: A4; margin: 12mm; }
 }
+
+.rally-picker { margin-bottom: 12px; }
+.rally-label { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--gray); margin-bottom: 6px; }
+.rally-label span { font-weight: bold; color: var(--green-dark); }
+.rally-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.rally-chip { min-height: 44px; font-size: 1rem; font-weight: bold; padding: 0; }
+.rally-chip.selected { background: var(--green); border-color: var(--green); color: #fff; }
